@@ -184,6 +184,11 @@
   .wheel-wrap { position: relative; width: min(340px, 85vw); margin: 10px auto 0; }
   #wheel { width: 100%; height: auto; display: block; border-radius: 50%; border: 5px solid var(--ink); box-sizing: border-box; }
   .wheel-pointer { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 2.2rem; color: var(--ink); z-index: 1; text-shadow: 0 2px 0 var(--bg); }
+  /* ---- Thumbnail maker ---- */
+  dialog.wide { max-width: 760px; }
+  #thumbCanvas { width: 100%; height: auto; display: block; border: 4px solid var(--ink); border-radius: 14px; }
+  .thumb-mini { width: 128px; height: 72px; border: 2px solid var(--ink); border-radius: 8px; object-fit: cover; cursor: pointer; }
+  .ep .thumb-mini { width: 100%; height: auto; display: block; margin: 4px 0 6px; }
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, calc(100% + 40px)); opacity: 0; z-index: 10;
     background: var(--gaming); color: white; font-weight: bold; padding: 14px 22px;
@@ -460,6 +465,10 @@
     <label>Concept</label><textarea id="epDesc" rows="2"></textarea>
     <label>Title options</label><textarea id="epTitleOpts" rows="2" placeholder="A few possible video titles"></textarea>
     <label>Thumbnail idea</label><textarea id="epThumb" rows="2"></textarea>
+    <div class="row" style="justify-content:flex-start;margin-top:6px">
+      <img id="epThumbPreview" class="thumb-mini" alt="Saved thumbnail" hidden>
+      <button class="btn small purple" type="button" id="thumbOpenBtn">🖼️ Generate thumbnail</button>
+    </div>
     <label>Spoken hook (first line of the video)</label><textarea id="epHook" rows="2"></textarea>
     <label>Punishment (for challenges)</label><input id="epPunish">
     <p class="row">
@@ -492,6 +501,23 @@
       </div>
     </form>
   </div>
+</dialog>
+
+<!-- 🖼️ Thumbnail maker (opens on top of the card pop-up) -->
+<dialog id="thumbDialog" class="wide">
+  <h2 style="margin-top:0">🖼️ Thumbnail maker</h2>
+  <canvas id="thumbCanvas" width="1280" height="720" aria-label="Thumbnail preview"></canvas>
+  <label for="thumbBig">Big text</label>
+  <input id="thumbBig" maxlength="40">
+  <label for="thumbSmall">Small text (optional)</label>
+  <input id="thumbSmall" maxlength="30" placeholder="e.g. IN THE DARK!">
+  <p class="row">
+    <button class="btn orange" type="button" id="thumbShuffle">🎲 Shuffle</button>
+    <button class="btn green" type="button" id="thumbSave">💾 Save to card</button>
+    <button class="btn purple" type="button" id="thumbDownload">⬇️ Download</button>
+    <button class="btn ghost" type="button" id="thumbClose">Close</button>
+  </p>
+  <p class="center"><small>Tip: the dashed circle is where a photo of your face could go. Download it and add your photo in any photo app!</small></p>
 </dialog>
 
 <script>
@@ -898,6 +924,7 @@ function renderBoard() {
         chip(ep.channel), ep.isShort ? el("span", { class: "chip Short" }, "⚡ Short") : "",
         el("h4", { onclick: () => openEpisode(ep) }, ep.title),
         el("p", {}, ep.desc),
+        ep.thumbStyle ? el("img", { class: "thumb-mini", src: thumbImage(ep.thumbStyle, ep.channel), alt: "Thumbnail", onclick: () => openEpisode(ep) }) : "",
         cardMeta(ep),
         el("div", { class: "moves" },
           el("button", { class: "btn small ghost", onclick: () => shift(ep, -1) }, "◀"),
@@ -932,6 +959,8 @@ function openEpisode(ep, jumpToComments = false) {
   $("epFilmDate").value = (ep && ep.filmDate) || "";
   $("epPostDate").value = (ep && ep.postDate) || "";
   draftJobs = ep && ep.jobs ? ep.jobs.map(j => ({ ...j })) : []; // a copy, so Cancel throws changes away
+  draftThumb = ep && ep.thumbStyle ? { ...ep.thumbStyle } : null;
+  renderThumbPreview();
   $("jobWho").value = "";
   renderJobs();
   renderChecklist();
@@ -964,7 +993,7 @@ $("epForm").addEventListener("submit", () => {
   const data = {
     title: $("epTitle").value.trim(), channel: $("epChannel").value, status: $("epStatus").value, desc: $("epDesc").value.trim(),
     titleOpts: $("epTitleOpts").value, thumb: $("epThumb").value, hook: $("epHook").value, punish: $("epPunish").value,
-    filmDate: $("epFilmDate").value, postDate: $("epPostDate").value, jobs: draftJobs
+    filmDate: $("epFilmDate").value, postDate: $("epPostDate").value, jobs: draftJobs, thumbStyle: draftThumb
   };
   // (If a sibling deleted this card while you were editing it, we just add it back.)
   const existing = editingId && episodes.find(e => e.id === editingId);
@@ -1875,6 +1904,226 @@ $("punishBtn").addEventListener("click", () => {
 
 drawWheel();
 renderNews();
+
+/* ---------- 4s. THUMBNAIL MAKER ----------
+   We draw a YouTube-size picture (1280 x 720) on a <canvas> with code.
+   Every design comes from a "seed" number: the same seed always draws the SAME picture,
+   so we only need to save { seed, big, small } on the card — not the whole image.
+   🎲 Shuffle just picks a new seed. */
+let draftThumb = null; // the thumbnail settings for the card that's open
+
+// A tiny random-number maker that always gives the same numbers for the same seed
+function seededRandom(seed) {
+  let t = seed >>> 0;
+  return () => { t += 0x6D2B79F5; let r = Math.imul(t ^ t >>> 15, 1 | t); r ^= r + Math.imul(r ^ r >>> 7, 61 | r); return ((r ^ r >>> 14) >>> 0) / 4294967296; };
+}
+
+const THUMB_BGS = {
+  Gaming:    [["#22c55e", "#0ea5e9"], ["#16a34a", "#facc15"], ["#7c3aed", "#22c55e"], ["#0f766e", "#84cc16"]],
+  Challenge: [["#f97316", "#ec4899"], ["#ef4444", "#f59e0b"], ["#ec4899", "#7c3aed"], ["#f43f5e", "#facc15"]]
+};
+const THUMB_STICKERS = {
+  Gaming:    ["⛏️", "💎", "🧱", "🐷", "🔥", "🏰", "⚔️", "🧟", "🏆", "😱"],
+  Challenge: ["😱", "🏆", "💥", "😂", "🎈", "🔥", "⏱️", "🤯", "🎉", "😳"]
+};
+// If the title has one of these words, use its emoji first
+const THUMB_KEYWORDS = {
+  water: "💦", hide: "🙈", seek: "🙈", dark: "🔦", boat: "⛵", fish: "🎣", dance: "💃", lava: "🌋", build: "🧱",
+  race: "🏁", balloon: "🎈", laugh: "😂", airplane: "✈️", maze: "🌀", fort: "🏰", mob: "🧟", diamond: "💎",
+  dragon: "🐉", farm: "🌾", underwater: "🐠", sky: "☁️", redstone: "🔴", zoo: "🦁", theme: "🎢", circle: "⭕",
+  blindfold: "🙈", mystery: "❓", talent: "🎤", drawing: "🎨", trading: "💰", house: "🏠", survive: "🏕️", speedrun: "⏱️"
+};
+
+function thumbStickers(style, channel, rand) {
+  const words = ((style.big || "") + " " + (style.small || "")).toLowerCase();
+  // Matching emojis first (a Set skips doubles, like "hide" AND "seek" both being 🙈)...
+  const picks = new Set(Object.keys(THUMB_KEYWORDS).filter(w => words.includes(w)).map(w => THUMB_KEYWORDS[w]));
+  // ...then fill up to 3 with random ones for this channel
+  const pool = THUMB_STICKERS[channel] || THUMB_STICKERS.Challenge;
+  while (picks.size < 3) picks.add(pool[Math.floor(rand() * pool.length)]);
+  return [...picks].slice(0, 3);
+}
+
+// Split text into lines that fit inside maxWidth
+function wrapLines(ctx, text, maxWidth) {
+  const words = text.split(/\s+/).filter(Boolean), lines = [];
+  let line = "";
+  words.forEach(w => {
+    const test = line ? line + " " + w : w;
+    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = w; } else line = test;
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+
+// THE DRAWING. w x h is the size to draw at; everything is measured as if it were 1280 x 720, then scaled.
+function drawThumbnail(canvas, style, channel) {
+  const ctx = canvas.getContext("2d");
+  const W = 1280, H = 720;
+  ctx.save();
+  ctx.scale(canvas.width / W, canvas.height / H);
+  const rand = seededRandom(style.seed);
+  const [c1, c2] = (THUMB_BGS[channel] || THUMB_BGS.Challenge)[Math.floor(rand() * 4)];
+  const textOnLeft = rand() < 0.5;
+
+  // 1) Background: a two-color gradient...
+  const grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, c1); grad.addColorStop(1, c2);
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+  // ...with a "sunburst" of light rays behind the stickers
+  const burstX = textOnLeft ? W * 0.78 : W * 0.22, burstY = H * 0.5;
+  ctx.fillStyle = "rgba(255,255,255,0.13)";
+  for (let i = 0; i < 16; i += 2) {
+    const a1 = i / 16 * Math.PI * 2, a2 = (i + 1) / 16 * Math.PI * 2;
+    ctx.beginPath(); ctx.moveTo(burstX, burstY);
+    ctx.lineTo(burstX + Math.cos(a1) * 1600, burstY + Math.sin(a1) * 1600);
+    ctx.lineTo(burstX + Math.cos(a2) * 1600, burstY + Math.sin(a2) * 1600);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // 2) Stickers (big emojis) and maybe a "your face here" circle, on the side away from the text
+  const stickers = thumbStickers(style, channel, rand);
+  const showFace = rand() < 0.5;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8;
+  if (showFace) {
+    ctx.save();
+    ctx.setLineDash([22, 16]); ctx.lineWidth = 10; ctx.strokeStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(burstX, burstY + 20, 190, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]); ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = "900 34px 'Arial Black', Impact, sans-serif";
+    ctx.fillText("YOUR FACE", burstX, burstY + 2); ctx.fillText("HERE 📸", burstX, burstY + 44);
+    ctx.restore();
+  }
+  const spots = showFace
+    ? [[burstX + (textOnLeft ? 150 : -150), H * 0.18, 150], [burstX + (textOnLeft ? -170 : 170), H * 0.84, 130]]
+    : [[burstX, burstY, 300], [burstX + (textOnLeft ? -180 : 180), H * 0.2, 150], [burstX + (textOnLeft ? 160 : -160), H * 0.83, 140]];
+  ctx.fillStyle = "#000000"; // solid paint, so the emojis aren't see-through like the light rays
+  spots.forEach(([x, y, size], i) => {
+    if (!stickers[i]) return;
+    ctx.save(); ctx.translate(x, y); ctx.rotate((rand() - 0.5) * 0.6);
+    ctx.font = size + "px 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+    ctx.fillText(stickers[i], 0, 0);
+    ctx.restore();
+  });
+
+  // 3) The BIG text: huge, white or yellow, with a thick dark outline, slightly tilted
+  const big = (style.big || "").toUpperCase();
+  const boxX = textOnLeft ? 60 : W * 0.45, boxW = W * 0.52;
+  let size = 150, lines;
+  do { ctx.font = "900 " + size + "px 'Arial Black', Impact, sans-serif"; lines = wrapLines(ctx, big, boxW); size -= 6; }
+  while ((lines.length > 3 || lines.some(l => ctx.measureText(l).width > boxW)) && size > 50);
+  size += 6;
+  const lineH = size * 1.05;
+  const small = (style.small || "").toUpperCase();
+  const blockH = lines.length * lineH + (small ? 90 : 0);
+  let y = (H - blockH) / 2 + lineH / 2;
+  ctx.save();
+  ctx.translate(boxX + boxW / 2, H / 2); ctx.rotate((rand() - 0.5) * 0.1); ctx.translate(-(boxX + boxW / 2), -H / 2);
+  ctx.textAlign = textOnLeft ? "left" : "right";
+  const textX = textOnLeft ? boxX : boxX + boxW;
+  ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 0; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 10;
+  ctx.lineJoin = "round"; ctx.lineWidth = size * 0.16; ctx.strokeStyle = "#1e1b4b";
+  ctx.fillStyle = rand() < 0.6 ? "#ffffff" : "#fde047";
+  lines.forEach(line => {
+    ctx.strokeText(line, textX, y);
+    ctx.shadowColor = "transparent"; ctx.fillText(line, textX, y); ctx.shadowColor = "rgba(0,0,0,0.4)";
+    y += lineH;
+  });
+  // 4) Small text on a yellow banner under the big text
+  if (small) {
+    ctx.shadowColor = "transparent";
+    ctx.font = "900 52px 'Arial Black', Impact, sans-serif";
+    const sw = Math.min(ctx.measureText(small).width + 50, boxW);
+    const bx = textOnLeft ? textX : textX - sw, by = y - lineH / 2 + 20;
+    ctx.fillStyle = "#facc15"; ctx.strokeStyle = "#1e1b4b"; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.roundRect(bx, by, sw, 76, 16); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#1e1b4b"; ctx.textAlign = "center";
+    ctx.fillText(small, bx + sw / 2, by + 40, sw - 30);
+  }
+  ctx.restore();
+
+  // 5) Maybe a big red arrow pointing from the text toward the stickers
+  if (rand() < 0.45) {
+    ctx.save();
+    ctx.translate(textOnLeft ? W * 0.6 : W * 0.4, H * 0.78); ctx.rotate(textOnLeft ? -0.5 : Math.PI + 0.5);
+    ctx.fillStyle = "#ef4444"; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(0, -18); ctx.lineTo(90, -18); ctx.lineTo(90, -48); ctx.lineTo(150, 0);
+    ctx.lineTo(90, 48); ctx.lineTo(90, 18); ctx.lineTo(0, 18); ctx.closePath();
+    ctx.stroke(); ctx.fill();
+    ctx.restore();
+  }
+
+  // 6) Little channel-name badge in the corner
+  ctx.shadowColor = "transparent";
+  ctx.font = "900 30px 'Arial Black', Impact, sans-serif";
+  const badge = channelName().toUpperCase();
+  const bw = ctx.measureText(badge).width + 40;
+  const badgeX = textOnLeft ? 40 : W - 40 - bw;
+  ctx.fillStyle = "rgba(30,27,75,0.85)";
+  ctx.beginPath(); ctx.roundRect(badgeX, 30, bw, 52, 26); ctx.fill();
+  ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(badge, badgeX + bw / 2, 57);
+  ctx.restore();
+}
+
+// Small pictures for the planner cards. We remember each one so we don't redraw it every time.
+const thumbCache = {};
+function thumbImage(style, channel) {
+  const key = JSON.stringify([style, channel, channelName()]);
+  if (!thumbCache[key]) {
+    const small = document.createElement("canvas");
+    small.width = 320; small.height = 180;
+    drawThumbnail(small, style, channel);
+    thumbCache[key] = small.toDataURL("image/jpeg", 0.85);
+  }
+  return thumbCache[key];
+}
+
+function renderThumbPreview() {
+  const img = $("epThumbPreview");
+  img.hidden = !draftThumb;
+  if (draftThumb) img.src = thumbImage(draftThumb, $("epChannel").value);
+}
+
+// The style being edited in the thumbnail maker
+let thumbStyle = null;
+function redrawThumb() { drawThumbnail($("thumbCanvas"), thumbStyle, $("epChannel").value); }
+const newSeed = () => Math.floor(Math.random() * 1e9);
+
+function openThumbMaker() {
+  // Start from the saved design, or a fresh one using the card's title
+  thumbStyle = draftThumb ? { ...draftThumb } : { seed: newSeed(), big: $("epTitle").value.trim() || "MY VIDEO", small: "" };
+  $("thumbBig").value = thumbStyle.big;
+  $("thumbSmall").value = thumbStyle.small;
+  $("thumbDialog").showModal();
+  redrawThumb();
+}
+$("thumbOpenBtn").addEventListener("click", openThumbMaker);
+$("epThumbPreview").addEventListener("click", openThumbMaker);
+$("thumbBig").addEventListener("input", () => { thumbStyle.big = $("thumbBig").value; redrawThumb(); });
+$("thumbSmall").addEventListener("input", () => { thumbStyle.small = $("thumbSmall").value; redrawThumb(); });
+$("thumbShuffle").addEventListener("click", () => { thumbStyle.seed = newSeed(); redrawThumb(); });
+$("thumbClose").addEventListener("click", () => $("thumbDialog").close());
+
+$("thumbSave").addEventListener("click", () => {
+  draftThumb = { ...thumbStyle };
+  renderThumbPreview();
+  // Existing card: save right away (so you don't lose it if you forget to press Save)
+  const ep = openCard();
+  if (ep) { ep.thumbStyle = { ...draftThumb }; saveAll(); }
+  $("thumbDialog").close();
+  showToast("🖼️ Thumbnail saved to the card!");
+});
+
+$("thumbDownload").addEventListener("click", () => {
+  // Turn the canvas into a picture file and "click" a hidden download link
+  const name = (thumbStyle.big || "thumbnail").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "thumbnail";
+  const link = el("a", { href: $("thumbCanvas").toDataURL("image/png"), download: name + "-thumbnail.png" });
+  document.body.append(link); link.click(); link.remove();
+  showToast("⬇️ Thumbnail downloaded! Check your Downloads.");
+});
 
 /* ---------- Draw everything ---------- */
 function renderAll() {
