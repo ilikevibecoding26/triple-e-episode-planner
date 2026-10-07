@@ -1943,9 +1943,20 @@ function seededRandom(seed) {
 }
 
 const THUMB_BGS = {
-  Gaming:    [["#22c55e", "#0ea5e9"], ["#16a34a", "#facc15"], ["#7c3aed", "#22c55e"], ["#0f766e", "#84cc16"]],
-  Challenge: [["#f97316", "#ec4899"], ["#ef4444", "#f59e0b"], ["#ec4899", "#7c3aed"], ["#f43f5e", "#facc15"]]
+  Gaming:    [["#22c55e", "#0ea5e9"], ["#16a34a", "#facc15"], ["#7c3aed", "#22c55e"], ["#0f766e", "#84cc16"],
+              ["#2563eb", "#06b6d4"], ["#65a30d", "#0891b2"], ["#1e3a8a", "#22c55e"], ["#9333ea", "#06b6d4"]],
+  Challenge: [["#f97316", "#ec4899"], ["#ef4444", "#f59e0b"], ["#ec4899", "#7c3aed"], ["#f43f5e", "#facc15"],
+              ["#db2777", "#f97316"], ["#dc2626", "#7c3aed"], ["#f59e0b", "#ef4444"], ["#c026d3", "#fb7185"]]
 };
+// Fonts that exist on Macs AND iPads (the later names are backups if the first isn't there)
+const THUMB_FONTS = [
+  s => "900 " + s + "px 'Arial Black', 'Avenir Next', Impact, sans-serif",
+  s => "bold " + s + "px 'Marker Felt', 'Comic Sans MS', cursive",
+  s => "bold " + s + "px 'Chalkboard SE', 'Comic Sans MS', cursive",
+  s => "bold " + s + "px Futura, 'Trebuchet MS', sans-serif",
+  s => "bold " + s + "px 'Arial Rounded MT Bold', Verdana, sans-serif"
+];
+const pickFrom = (rand, list) => list[Math.floor(rand() * list.length)];
 const THUMB_STICKERS = {
   Gaming:    ["⛏️", "💎", "🧱", "🐷", "🔥", "🏰", "⚔️", "🧟", "🏆", "😱"],
   Challenge: ["😱", "🏆", "💥", "😂", "🎈", "🔥", "⏱️", "🤯", "🎉", "😳"]
@@ -1980,49 +1991,117 @@ function wrapLines(ctx, text, maxWidth) {
   return lines;
 }
 
-// THE DRAWING. w x h is the size to draw at; everything is measured as if it were 1280 x 720, then scaled.
+// THE DRAWING. Everything is measured as if the picture were 1280 x 720, then scaled to the canvas size.
+// The seed decides EVERY choice below (layout, background, font, colors, extras),
+// so 🎲 Shuffle can make very different pictures.
 function drawThumbnail(canvas, style, channel) {
   const ctx = canvas.getContext("2d");
   const W = 1280, H = 720;
   ctx.save();
   ctx.scale(canvas.width / W, canvas.height / H);
   const rand = seededRandom(style.seed);
-  const [c1, c2] = (THUMB_BGS[channel] || THUMB_BGS.Challenge)[Math.floor(rand() * 4)];
-  const textOnLeft = rand() < 0.5;
 
-  // 1) Background: a two-color gradient...
+  // ---- Step 1: roll the dice for this design ----
+  const look = {
+    layout: pickFrom(rand, ["side", "center", "versus", "bottom"]),
+    background: pickFrom(rand, channel === "Gaming" ? ["rays", "stripes", "pixels", "plain"] : ["rays", "stripes", "dots", "confetti"]),
+    colors: pickFrom(rand, THUMB_BGS[channel] || THUMB_BGS.Challenge),
+    font: pickFrom(rand, THUMB_FONTS),
+    textColor: pickFrom(rand, ["#ffffff", "#fde047", "mix"]),
+    outline: pickFrom(rand, ["#1e1b4b", "#000000", "#7c2d12", "#4c1d95"]),
+    flip: rand() < 0.5, // mirror left/right
+    arrow: rand() < 0.4, face: rand() < 0.35, newBadge: rand() < 0.3, ring: rand() < 0.3
+  };
+  const [c1, c2] = look.colors;
+  const stickers = thumbStickers(style, channel, rand);
+  const big = (style.big || "").toUpperCase(), small = (style.small || "").toUpperCase();
+
+  // ---- Step 2: where things go, for each layout ----
+  // text = the box the big words fit in; spots = sticker [x, y, size]; focus = center of the light rays
+  let text, spots, focus, face = null;
+  const side = x => look.flip ? W - x : x; // flips a left/right position
+  if (look.layout === "side") {
+    text = { x: side(60) - (look.flip ? W * 0.52 : 0), y: 90, w: W * 0.52, h: 560, lines: 3, align: look.flip ? "right" : "left" };
+    focus = [side(W * 0.78), H * 0.5];
+    if (look.face) {
+      face = [focus[0], focus[1] + 20, 190];
+      spots = [[focus[0] + (look.flip ? -150 : 150), H * 0.17, 150], [focus[0] + (look.flip ? 170 : -170), H * 0.84, 130]];
+    } else {
+      spots = [[focus[0], focus[1], 300], [focus[0] + (look.flip ? 180 : -180), H * 0.2, 150], [focus[0] + (look.flip ? -160 : 160), H * 0.83, 140]];
+    }
+  } else if (look.layout === "center") {
+    text = { x: W * 0.08, y: 110, w: W * 0.84, h: 380, lines: 2, align: "center" };
+    focus = [W / 2, H / 2];
+    spots = [[W * 0.14, H * 0.8, 200], [W * 0.86, H * 0.8, 200], [W * 0.5, H * 0.84, 150]];
+    if (look.face) { face = [W * 0.5, H * 0.8, 120]; spots = spots.slice(0, 2); }
+  } else if (look.layout === "versus") {
+    text = { x: W * 0.06, y: 20, w: W * 0.88, h: 210, lines: 2, align: "center" };
+    focus = [W / 2, H * 0.6];
+    spots = [[W * 0.22, H * 0.62, 250], [W * 0.78, H * 0.62, 250]];
+  } else { // "bottom": big sticker on top, words on a dark bar underneath
+    text = { x: W * 0.05, y: H * 0.6, w: W * 0.9, h: H * 0.36, lines: 2, align: "center" };
+    focus = [W / 2, H * 0.3];
+    spots = [[W / 2, H * 0.31, 280], [W * 0.2, H * 0.26, 150], [W * 0.8, H * 0.26, 150]];
+    if (look.face) { face = [side(W * 0.2), H * 0.3, 150]; spots = [spots[0], [side(W * 0.8), H * 0.26, 150]]; }
+  }
+
+  // ---- Step 3: background ----
   const grad = ctx.createLinearGradient(0, 0, W, H);
   grad.addColorStop(0, c1); grad.addColorStop(1, c2);
   ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-  // ...with a "sunburst" of light rays behind the stickers
-  const burstX = textOnLeft ? W * 0.78 : W * 0.22, burstY = H * 0.5;
-  ctx.fillStyle = "rgba(255,255,255,0.13)";
-  for (let i = 0; i < 16; i += 2) {
-    const a1 = i / 16 * Math.PI * 2, a2 = (i + 1) / 16 * Math.PI * 2;
-    ctx.beginPath(); ctx.moveTo(burstX, burstY);
-    ctx.lineTo(burstX + Math.cos(a1) * 1600, burstY + Math.sin(a1) * 1600);
-    ctx.lineTo(burstX + Math.cos(a2) * 1600, burstY + Math.sin(a2) * 1600);
-    ctx.closePath(); ctx.fill();
+  if (look.layout === "versus") {
+    // split screen: one color on the left, the other on the right, with a slanted line
+    ctx.fillStyle = c1; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(W * 0.56, 0); ctx.lineTo(W * 0.44, H); ctx.lineTo(0, H); ctx.fill();
+    ctx.fillStyle = c2; ctx.beginPath(); ctx.moveTo(W * 0.56, 0); ctx.lineTo(W, 0); ctx.lineTo(W, H); ctx.lineTo(W * 0.44, H); ctx.fill();
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 14; ctx.beginPath(); ctx.moveTo(W * 0.56, 0); ctx.lineTo(W * 0.44, H); ctx.stroke();
   }
+  ctx.fillStyle = "rgba(255,255,255,0.13)";
+  if (look.background === "rays") {
+    for (let i = 0; i < 18; i += 2) {
+      const a1 = i / 18 * Math.PI * 2, a2 = (i + 1) / 18 * Math.PI * 2;
+      ctx.beginPath(); ctx.moveTo(focus[0], focus[1]);
+      ctx.lineTo(focus[0] + Math.cos(a1) * 1600, focus[1] + Math.sin(a1) * 1600);
+      ctx.lineTo(focus[0] + Math.cos(a2) * 1600, focus[1] + Math.sin(a2) * 1600);
+      ctx.fill();
+    }
+  } else if (look.background === "stripes") {
+    for (let x = -H; x < W; x += 120) { ctx.beginPath(); ctx.moveTo(x, H); ctx.lineTo(x + 60, H); ctx.lineTo(x + 60 + H, 0); ctx.lineTo(x + H, 0); ctx.fill(); }
+  } else if (look.background === "dots") {
+    for (let y = 40; y < H; y += 90) for (let x = (y / 90 % 2) * 45 + 40; x < W; x += 90) { ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2); ctx.fill(); }
+  } else if (look.background === "pixels") {
+    // Minecraft-style blocks: squares a little lighter or darker than the background
+    for (let y = 0; y < H; y += 80) for (let x = 0; x < W; x += 80) {
+      const shade = rand();
+      ctx.fillStyle = shade < 0.5 ? "rgba(255,255,255," + shade * 0.25 + ")" : "rgba(0,0,0," + (shade - 0.5) * 0.25 + ")";
+      ctx.fillRect(x, y, 80, 80);
+    }
+  } else if (look.background === "confetti") {
+    const confettiColors = ["#fde047", "#ffffff", "#22d3ee", "#a3e635", "#f472b6"];
+    for (let i = 0; i < 70; i++) {
+      ctx.save(); ctx.translate(rand() * W, rand() * H); ctx.rotate(rand() * Math.PI);
+      ctx.fillStyle = pickFrom(rand, confettiColors); ctx.globalAlpha = 0.55; ctx.fillRect(-12, -5, 24, 10);
+      ctx.restore();
+    }
+  }
+  // a soft dark edge around the picture makes the middle "pop"
+  const edge = ctx.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.75);
+  edge.addColorStop(0, "rgba(0,0,0,0)"); edge.addColorStop(1, "rgba(0,0,0,0.35)");
+  ctx.fillStyle = edge; ctx.fillRect(0, 0, W, H);
+  if (look.layout === "bottom") { ctx.fillStyle = "rgba(15,12,40,0.7)"; ctx.fillRect(0, H * 0.58, W, H * 0.42); }
 
-  // 2) Stickers (big emojis) and maybe a "your face here" circle, on the side away from the text
-  const stickers = thumbStickers(style, channel, rand);
-  const showFace = rand() < 0.5;
+  // ---- Step 4: stickers, "face here" circle, and a red ring ----
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8;
-  if (showFace) {
+  if (face) {
     ctx.save();
     ctx.setLineDash([22, 16]); ctx.lineWidth = 10; ctx.strokeStyle = "#ffffff";
-    ctx.beginPath(); ctx.arc(burstX, burstY + 20, 190, 0, Math.PI * 2); ctx.stroke();
-    ctx.setLineDash([]); ctx.shadowBlur = 0;
-    ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = "900 34px 'Arial Black', Impact, sans-serif";
-    ctx.fillText("YOUR FACE", burstX, burstY + 2); ctx.fillText("HERE 📸", burstX, burstY + 44);
+    ctx.beginPath(); ctx.arc(face[0], face[1], face[2], 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = "900 " + Math.round(face[2] * 0.18) + "px 'Arial Black', 'Avenir Next', sans-serif";
+    ctx.fillText("YOUR FACE", face[0], face[1] - face[2] * 0.1); ctx.fillText("HERE 📸", face[0], face[1] + face[2] * 0.14);
     ctx.restore();
   }
-  const spots = showFace
-    ? [[burstX + (textOnLeft ? 150 : -150), H * 0.18, 150], [burstX + (textOnLeft ? -170 : 170), H * 0.84, 130]]
-    : [[burstX, burstY, 300], [burstX + (textOnLeft ? -180 : 180), H * 0.2, 150], [burstX + (textOnLeft ? 160 : -160), H * 0.83, 140]];
-  ctx.fillStyle = "#000000"; // solid paint, so the emojis aren't see-through like the light rays
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8;
+  ctx.fillStyle = "#000000"; // solid paint, so the emojis aren't see-through
   spots.forEach(([x, y, size], i) => {
     if (!stickers[i]) return;
     ctx.save(); ctx.translate(x, y); ctx.rotate((rand() - 0.5) * 0.6);
@@ -2030,66 +2109,100 @@ function drawThumbnail(canvas, style, channel) {
     ctx.fillText(stickers[i], 0, 0);
     ctx.restore();
   });
+  ctx.restore();
+  if (look.ring && spots[0]) {
+    const [x, y, size] = spots[0];
+    ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 14;
+    ctx.beginPath(); ctx.ellipse(x, y, size * 0.72, size * 0.62, -0.2, 0, Math.PI * 2); ctx.stroke();
+  }
+  if (look.layout === "versus") {
+    // a big "VS" on a yellow starburst in the middle
+    starburst(ctx, W / 2, H * 0.6, 120, 85, 14, "#facc15", look.outline);
+    ctx.font = "900 110px 'Arial Black', 'Avenir Next', Impact, sans-serif";
+    ctx.lineWidth = 14; ctx.strokeStyle = look.outline; ctx.lineJoin = "round";
+    ctx.strokeText("VS", W / 2, H * 0.6 + 6); ctx.fillStyle = "#ffffff"; ctx.fillText("VS", W / 2, H * 0.6 + 6);
+  }
 
-  // 3) The BIG text: huge, white or yellow, with a thick dark outline, slightly tilted
-  const big = (style.big || "").toUpperCase();
-  const boxX = textOnLeft ? 60 : W * 0.45, boxW = W * 0.52;
-  let size = 150, lines;
-  do { ctx.font = "900 " + size + "px 'Arial Black', Impact, sans-serif"; lines = wrapLines(ctx, big, boxW); size -= 6; }
-  while ((lines.length > 3 || lines.some(l => ctx.measureText(l).width > boxW)) && size > 50);
+  // ---- Step 5: the BIG words, made as large as they can be while still fitting ----
+  let size = 160, lines;
+  do { ctx.font = look.font(size); lines = wrapLines(ctx, big, text.w); size -= 6; }
+  while ((lines.length > text.lines || lines.some(l => ctx.measureText(l).width > text.w) || lines.length * size * 1.05 > text.h - (small ? 80 : 0)) && size > 40);
   size += 6;
   const lineH = size * 1.05;
-  const small = (style.small || "").toUpperCase();
   const blockH = lines.length * lineH + (small ? 90 : 0);
-  let y = (H - blockH) / 2 + lineH / 2;
+  let y = text.y + (text.h - blockH) / 2 + lineH / 2;
+  const textX = text.align === "left" ? text.x : text.align === "right" ? text.x + text.w : text.x + text.w / 2;
   ctx.save();
-  ctx.translate(boxX + boxW / 2, H / 2); ctx.rotate((rand() - 0.5) * 0.1); ctx.translate(-(boxX + boxW / 2), -H / 2);
-  ctx.textAlign = textOnLeft ? "left" : "right";
-  const textX = textOnLeft ? boxX : boxX + boxW;
-  ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 0; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 10;
-  ctx.lineJoin = "round"; ctx.lineWidth = size * 0.16; ctx.strokeStyle = "#1e1b4b";
-  ctx.fillStyle = rand() < 0.6 ? "#ffffff" : "#fde047";
-  lines.forEach(line => {
+  const cx = text.x + text.w / 2, cy = text.y + text.h / 2;
+  ctx.translate(cx, cy); ctx.rotate((rand() - 0.5) * (look.layout === "side" ? 0.1 : 0.05)); ctx.translate(-cx, -cy);
+  ctx.textAlign = text.align; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+  lines.forEach((line, i) => {
+    ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 10; ctx.shadowBlur = 0;
+    ctx.lineWidth = size * 0.16; ctx.strokeStyle = look.outline;
     ctx.strokeText(line, textX, y);
-    ctx.shadowColor = "transparent"; ctx.fillText(line, textX, y); ctx.shadowColor = "rgba(0,0,0,0.4)";
+    ctx.shadowColor = "transparent";
+    ctx.fillStyle = look.textColor === "mix" ? (i % 2 ? "#fde047" : "#ffffff") : look.textColor;
+    ctx.fillText(line, textX, y);
     y += lineH;
   });
-  // 4) Small text on a yellow banner under the big text
+  // ---- Step 6: small words on a banner under the big words ----
   if (small) {
-    ctx.shadowColor = "transparent";
-    ctx.font = "900 52px 'Arial Black', Impact, sans-serif";
-    const sw = Math.min(ctx.measureText(small).width + 50, boxW);
-    const bx = textOnLeft ? textX : textX - sw, by = y - lineH / 2 + 20;
-    ctx.fillStyle = "#facc15"; ctx.strokeStyle = "#1e1b4b"; ctx.lineWidth = 8;
+    ctx.font = "900 52px 'Arial Black', 'Avenir Next', Impact, sans-serif";
+    const sw = Math.min(ctx.measureText(small).width + 50, text.w);
+    const bx = text.align === "left" ? textX : text.align === "right" ? textX - sw : textX - sw / 2;
+    const by = y - lineH / 2 + 18;
+    ctx.fillStyle = look.textColor === "#fde047" ? "#ffffff" : "#facc15"; ctx.strokeStyle = look.outline; ctx.lineWidth = 8;
     ctx.beginPath(); ctx.roundRect(bx, by, sw, 76, 16); ctx.fill(); ctx.stroke();
     ctx.fillStyle = "#1e1b4b"; ctx.textAlign = "center";
     ctx.fillText(small, bx + sw / 2, by + 40, sw - 30);
   }
   ctx.restore();
 
-  // 5) Maybe a big red arrow pointing from the text toward the stickers
-  if (rand() < 0.45) {
-    ctx.save();
-    ctx.translate(textOnLeft ? W * 0.6 : W * 0.4, H * 0.78); ctx.rotate(textOnLeft ? -0.5 : Math.PI + 0.5);
+  // ---- Step 7: extras ----
+  if (look.arrow && look.layout !== "versus") {
+    // a big red arrow pointing at the main sticker
+    const [tx, ty] = spots[0] || focus;
+    const from = look.layout === "bottom" ? [tx + 260, ty + 120] : look.layout === "center" ? [tx + 150, ty - 170] : [W / 2, H * 0.78];
+    const angle = Math.atan2(ty - from[1], tx - from[0]);
+    ctx.save(); ctx.translate(from[0], from[1]); ctx.rotate(angle);
     ctx.fillStyle = "#ef4444"; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 8;
     ctx.beginPath();
-    ctx.moveTo(0, -18); ctx.lineTo(90, -18); ctx.lineTo(90, -48); ctx.lineTo(150, 0);
-    ctx.lineTo(90, 48); ctx.lineTo(90, 18); ctx.lineTo(0, 18); ctx.closePath();
+    ctx.moveTo(0, -18); ctx.lineTo(80, -18); ctx.lineTo(80, -46); ctx.lineTo(140, 0); ctx.lineTo(80, 46); ctx.lineTo(80, 18); ctx.lineTo(0, 18); ctx.closePath();
     ctx.stroke(); ctx.fill();
     ctx.restore();
   }
-
-  // 6) Little channel-name badge in the corner
-  ctx.shadowColor = "transparent";
-  ctx.font = "900 30px 'Arial Black', Impact, sans-serif";
+  // channel name badge in one top corner, "NEW!" starburst in the other
+  const badgeOnLeft = !look.flip;
+  ctx.font = "900 30px 'Arial Black', 'Avenir Next', Impact, sans-serif";
   const badge = channelName().toUpperCase();
   const bw = ctx.measureText(badge).width + 40;
-  const badgeX = textOnLeft ? 40 : W - 40 - bw;
+  const badgeX = badgeOnLeft ? 34 : W - 34 - bw;
+  const badgeY = look.layout === "versus" ? H - 82 : 30; // versus has the title at the top, so put it at the bottom
   ctx.fillStyle = "rgba(30,27,75,0.85)";
-  ctx.beginPath(); ctx.roundRect(badgeX, 30, bw, 52, 26); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(badgeX, badgeY, bw, 52, 26); ctx.fill();
   ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(badge, badgeX + bw / 2, 57);
+  ctx.fillText(badge, badgeX + bw / 2, badgeY + 27);
+  if (look.newBadge) {
+    const nx = badgeOnLeft ? W - 95 : 95, ny = look.layout === "versus" ? H - 95 : 95;
+    ctx.save(); ctx.translate(nx, ny); ctx.rotate(0.25);
+    starburst(ctx, 0, 0, 80, 60, 12, "#facc15", "#dc2626");
+    ctx.fillStyle = "#dc2626"; ctx.font = "900 38px 'Arial Black', 'Avenir Next', Impact, sans-serif";
+    ctx.fillText("NEW!", 0, 2);
+    ctx.restore();
+  }
   ctx.restore();
+}
+
+// A pointy star shape (like a comic-book "POW!"), used for "VS" and "NEW!"
+function starburst(ctx, x, y, outer, inner, points, fill, stroke) {
+  ctx.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 ? inner : outer, a = i / (points * 2) * Math.PI * 2 - Math.PI / 2;
+    ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+  }
+  ctx.closePath();
+  ctx.fillStyle = fill; ctx.fill();
+  ctx.lineWidth = 8; ctx.strokeStyle = stroke; ctx.stroke();
 }
 
 // Small pictures for the planner cards. We remember each one so we don't redraw it every time.
