@@ -116,6 +116,10 @@
   .empty { text-align: center; opacity: .6; padding: 10px; }
   /* ---- Chat ---- */
   #chatList { height: 50vh; min-height: 260px; overflow-y: auto; border: 3px solid var(--ink); border-radius: 16px; padding: 10px; background: #f5f3ff; }
+  /* When there are no messages yet, show a friendly hint inside the box
+     (":empty" means "has nothing inside it"; it goes away once a message arrives) */
+  #chatList:empty { height: auto; min-height: 140px; display: flex; align-items: center; justify-content: center; }
+  #chatList:empty::before { content: "No messages yet — be the first to say hi! 👋"; font-size: 1.2rem; font-weight: bold; opacity: .6; text-align: center; }
   .msg { max-width: 80%; margin: 6px 0; padding: 8px 12px; border: 2px solid var(--ink); border-radius: 16px; background: white; overflow-wrap: anywhere; }
   .msg.mine { margin-left: auto; background: #fce7f3; }
   .msg .who { font-size: .75rem; font-weight: bold; color: var(--purple); }
