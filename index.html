@@ -242,6 +242,7 @@
   #shotItems li { padding: 3px 0; }
   #shotItems .check-item { padding: 0; }
   #shotItems .check-item button { opacity: .6; }
+  #scriptText { font-family: ui-monospace, Menlo, monospace; font-size: .85rem; line-height: 1.45; min-height: 50vh; }
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, calc(100% + 40px)); opacity: 0; z-index: 10;
     background: var(--gaming); color: white; font-weight: bold; padding: 14px 22px;
@@ -609,6 +610,7 @@
     <div class="row" style="justify-content:flex-start;margin-top:6px">
       <img id="epThumbPreview" class="thumb-mini" alt="Saved thumbnail" hidden>
       <button class="btn small purple" type="button" id="thumbOpenBtn">🖼️ Generate thumbnail</button>
+      <button class="btn small orange" type="button" id="scriptOpenBtn">📝 Generate script</button>
     </div>
     <label>Spoken hook (first line of the video)</label><textarea id="epHook" rows="2"></textarea>
     <label>Punishment (for challenges)</label><input id="epPunish">
@@ -652,6 +654,21 @@
       </div>
     </form>
   </div>
+</dialog>
+
+<!-- 📝 Script maker (opens on top of the card pop-up) -->
+<dialog id="scriptDialog" class="wide">
+  <h2 style="margin-top:0">📝 Script maker</h2>
+  <p style="margin-top:0"><small>Made from this card's title, description, hook, punishment, who's Starring, and shot list.
+    Change anything you want — it's YOUR script!</small></p>
+  <textarea id="scriptText" rows="18" spellcheck="true"></textarea>
+  <p class="row">
+    <button class="btn orange" type="button" id="scriptShuffle">🎲 New version</button>
+    <button class="btn green" type="button" id="scriptSave">💾 Save to card</button>
+    <button class="btn purple" type="button" id="scriptCopy">📋 Copy</button>
+    <button class="btn purple" type="button" id="scriptDownload">⬇️ Download</button>
+    <button class="btn ghost" type="button" id="scriptClose">Close</button>
+  </p>
 </dialog>
 
 <!-- 🖼️ Thumbnail maker (opens on top of the card pop-up) -->
@@ -1119,6 +1136,8 @@ function openEpisode(ep, jumpToComments = false) {
   $("epPostDate").value = (ep && ep.postDate) || "";
   draftJobs = ep && ep.jobs ? ep.jobs.map(j => ({ ...j })) : []; // a copy, so Cancel throws changes away
   draftThumb = ep && ep.thumbStyle ? { ...ep.thumbStyle } : null;
+  draftScript = (ep && ep.script) || "";
+  $("scriptOpenBtn").textContent = draftScript ? "📝 Open script" : "📝 Generate script";
   renderThumbPreview();
   $("jobWho").value = "";
   renderJobs();
@@ -1153,7 +1172,7 @@ $("epForm").addEventListener("submit", () => {
   const data = {
     title: $("epTitle").value.trim(), channel: $("epChannel").value, status: $("epStatus").value, desc: $("epDesc").value.trim(),
     titleOpts: $("epTitleOpts").value, thumb: $("epThumb").value, hook: $("epHook").value, punish: $("epPunish").value,
-    filmDate: $("epFilmDate").value, postDate: $("epPostDate").value, jobs: draftJobs, thumbStyle: draftThumb
+    filmDate: $("epFilmDate").value, postDate: $("epPostDate").value, jobs: draftJobs, thumbStyle: draftThumb, script: draftScript
   };
   // (If a sibling deleted this card while you were editing it, we just add it back.)
   const existing = editingId && episodes.find(e => e.id === editingId);
@@ -1743,6 +1762,7 @@ function cardMeta(ep) {
   if (list.length) bits.push(el("span", {}, ico("✅", "Done:") + " " + list.filter(c => c.done).length + "/" + list.length));
   const shots = ep.shots || [];
   if (shots.length) bits.push(el("span", {}, ico("🎥", "Shots:") + " " + shots.filter(c => c.done).length + "/" + shots.length));
+  if (ep.script) bits.push(el("span", {}, ico("📝", "") + " Script ready"));
   return bits.length ? el("div", { class: "meta" }, ...bits) : "";
 }
 
@@ -2419,6 +2439,165 @@ $("thumbDownload").addEventListener("click", () => {
   const link = el("a", { href: $("thumbCanvas").toDataURL("image/png"), download: name + "-thumbnail.png" });
   document.body.append(link); link.click(); link.remove();
   showToast("⬇️ Thumbnail downloaded! Check your Downloads.");
+});
+
+/* ---------- 4s2. SCRIPT MAKER ----------
+   Just like the thumbnail maker, it uses a seed: the same seed gives the same script,
+   and 🎲 New version picks a new seed for different wording.
+   The script is built in sections: HOOK, INTRO, THE CHALLENGE, RULES, ROUNDS, WINNER, OUTRO. */
+let draftScript = "";  // the script for the card that's open
+let scriptSeed = 1;
+
+const SCRIPT_BITS = {
+  hooks: [
+    "{TITLE}... and only ONE of us can win!",
+    "We have NEVER done anything this crazy before. Today: {title}!",
+    "3 siblings. 1 challenge. Who's going to win {title}?",
+    "Okay, this might be our hardest video EVER.",
+    "Whoever loses today gets the WORST punishment. I can NOT lose!"
+  ],
+  explain: ["So here's the challenge: {desc}", "Okay, the rules are simple: {desc}", "Here's how it works: {desc}"],
+  rules: {
+    Challenge: ["no cheating!", "the judge's decision is FINAL.", "no touching each other!",
+                "have fun... but also WIN.", "if you break a rule, you're OUT!"],
+    Gaming: ["same gear, same time limit, no excuses!", "no breaking each other's stuff... probably.", "stay in the area we marked out.",
+             "the comments decide who really won!", "no looking at each other's screens!"]
+  },
+  roundStart: ["Three... two... one... GO!", "Okay, round {n}! Is everybody ready?", "Here we go, round {n}!", "Let's do this!"],
+  reactions: {
+    Challenge: ["Wait, WHAT just happened?!", "This is WAY harder than I thought!", "No way! You can't do that!", "I'm SO close!",
+                "Don't make me laugh, don't make me laugh...", "Okay okay, I've got a plan.", "That was SO funny!", "I'm not giving up!"],
+    Gaming: ["Wait, where did you GO?!", "My build is going to be SO good.", "Who put THAT there?!", "I'm almost out of time!",
+             "Okay, don't look at mine yet!", "That's actually genius.", "NOOO, I fell!", "I found diamonds!"]
+  },
+  tips: {
+    Challenge: ["[Close-up of everyone's faces]", "[Show the timer on screen]", "[Funny zoom-in + sound effect]", "[Slow-motion replay]", "[Cut to the judge's reaction]"],
+    Gaming: ["[Show everyone's screens side by side]", "[Zoom in on the build]", "[Show the timer on screen]", "[Funny zoom-in + sound effect]", "[Fly-through tour of the builds]"]
+  },
+  outro: ["If you want to see more videos like this, ask a grown-up to help you hit subscribe!",
+          "Comment down below who YOU think should have won!", "Which challenge should we do next? Tell us in the comments!",
+          "Thanks for watching, see you next time on {channel}!", "Bye everyone! Peace out!"]
+};
+
+function makeScript(seed) {
+  const rand = seededRandom(seed);
+  const pickR = list => list[Math.floor(rand() * list.length)];
+  const channel = $("epChannel").value;
+  const title = $("epTitle").value.trim() || "Our New Video";
+  const desc = $("epDesc").value.trim() || "(describe the challenge here!)";
+  const hook = $("epHook").value.trim();
+  const punishment = $("epPunish").value.trim() || pickR(PUNISHMENTS);
+  // Who's in the video? People with the "Starring" job, or else everyone we know, or else placeholders
+  let cast = draftJobs.filter(j => j.what === "Starring").map(j => j.who);
+  if (!cast.length) cast = familyNames();
+  if (!cast.length) cast = ["Sibling 1", "Sibling 2", "Sibling 3"];
+  // Remove repeats, even if the capitals are different ("Edie" and "edie" are the same person)
+  cast = cast.filter((name, i) => cast.findIndex(n => n.toLowerCase() === name.toLowerCase()) === i);
+  let turn = Math.floor(rand() * cast.length);
+  const who = () => cast[turn++ % cast.length].toUpperCase(); // takes turns talking
+  const fill = text => text.replace("{TITLE}", title.toUpperCase()).replace("{title}", title).replace("{desc}", desc)
+    .replace("{punishment}", punishment).replace("{channel}", channelName());
+  const say = text => who() + ": " + fill(text);
+
+  const lines = [];
+  const section = name => { lines.push(""); lines.push("=== " + name + " ==="); };
+  lines.push("SCRIPT: " + title.toUpperCase());
+  lines.push("Channel: " + channel + " · Starring: " + cast.join(", "));
+
+  section("1. HOOK (first 5 seconds!)");
+  lines.push(hook ? cast[0].toUpperCase() + ": " + hook : say(pickR(SCRIPT_BITS.hooks)));
+  lines.push(pickR(SCRIPT_BITS.tips[channel] || SCRIPT_BITS.tips.Challenge));
+
+  section("2. INTRO");
+  lines.push(say(pickR(INTROS).replace("Triple E Studios", channelName())));
+
+  section("3. THE CHALLENGE");
+  lines.push(say(pickR(SCRIPT_BITS.explain)));
+  lines.push(say("And whoever loses gets a punishment: " + punishment + "!"));
+  lines.push(who() + ": Oh no...");
+
+  section("4. RULES");
+  const rules = [...(SCRIPT_BITS.rules[channel] || SCRIPT_BITS.rules.Challenge)];
+  ["one", "two", "three"].forEach(num => lines.push(say("Rule number " + num + ": " + rules.splice(Math.floor(rand() * rules.length), 1)[0])));
+
+  // Rounds: use the shot list's middle scenes if there is one, otherwise 3 rounds
+  const card = openCard();
+  const shots = ((card && card.shots) || []).map(s => s.text)
+    .filter(t => !/intro|hook|rules|outro|subscribe|winner|punishment/i.test(t));
+  const rounds = shots.length ? shots : ["Round 1", "Round 2", "Final round"];
+  // Each reaction gets used once before any of them repeat
+  let reactions = [];
+  const nextReaction = () => {
+    if (!reactions.length) reactions = [...(SCRIPT_BITS.reactions[channel] || SCRIPT_BITS.reactions.Challenge)];
+    return reactions.splice(Math.floor(rand() * reactions.length), 1)[0];
+  };
+  rounds.forEach((name, i) => {
+    section((5 + i) + ". " + name.toUpperCase());
+    lines.push(say(pickR(SCRIPT_BITS.roundStart).replace("{n}", i + 1)));
+    lines.push(pickR(SCRIPT_BITS.tips[channel] || SCRIPT_BITS.tips.Challenge));
+    for (let r = 0; r < 2; r++) lines.push(say(nextReaction()));
+    lines.push("[What actually happens: ______________________ ]");
+  });
+
+  const n = 5 + rounds.length;
+  section(n + ". WINNER + PUNISHMENT");
+  lines.push("[Drumroll... dramatic music!]");
+  lines.push(say("And the winner is..."));
+  lines.push("[WINNER: ________ ]   [LOSER: ________ ]");
+  lines.push(say("Time for the punishment: " + punishment + "!"));
+  lines.push("[Film the punishment, then add it to the 🏆 Scoreboard!]");
+
+  section((n + 1) + ". OUTRO");
+  const outros = [...SCRIPT_BITS.outro];
+  for (let i = 0; i < 3; i++) lines.push(say(outros.splice(Math.floor(rand() * outros.length), 1)[0]));
+
+  // About how long is it? People talk about 150 words a minute; add time for the action
+  const words = lines.join(" ").split(/\s+/).length;
+  const minutes = Math.max(1, Math.round(words / 150 + rounds.length * 1.5));
+  lines.splice(2, 0, "About " + minutes + " minute" + (minutes === 1 ? "" : "s") + " long (plus however long the challenge takes!)");
+  return lines.join("\n");
+}
+
+function openScriptMaker() {
+  // A saved script opens as-is; otherwise make a fresh one
+  if (!draftScript) { scriptSeed = newSeed(); $("scriptText").value = makeScript(scriptSeed); }
+  else $("scriptText").value = draftScript;
+  $("scriptDialog").showModal();
+  $("scriptText").scrollTop = 0;
+}
+$("scriptOpenBtn").addEventListener("click", openScriptMaker);
+$("scriptClose").addEventListener("click", () => $("scriptDialog").close());
+$("scriptShuffle").addEventListener("click", e => {
+  // New version replaces your edits, so ask first (tap twice) if you've changed the text
+  const generated = makeScript(scriptSeed);
+  const edited = $("scriptText").value !== generated && $("scriptText").value !== draftScript;
+  const go = () => { scriptSeed = newSeed(); $("scriptText").value = makeScript(scriptSeed); $("scriptText").scrollTop = 0; };
+  if (edited) twoTapDelete(e.currentTarget, "🎲 New version", go); else go();
+});
+
+$("scriptSave").addEventListener("click", () => {
+  draftScript = $("scriptText").value;
+  $("scriptOpenBtn").textContent = draftScript ? "📝 Open script" : "📝 Generate script";
+  // Existing card: save right away, like the thumbnail
+  const card = openCard();
+  if (card) { card.script = draftScript; saveAll(); }
+  $("scriptDialog").close();
+  showToast("📝 Script saved to the card!");
+});
+
+$("scriptCopy").addEventListener("click", async () => {
+  const text = $("scriptText").value;
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) { $("scriptText").select(); document.execCommand("copy"); } // older way, for older browsers
+  showToast("📋 Script copied! Paste it anywhere.");
+});
+
+$("scriptDownload").addEventListener("click", () => {
+  const name = ($("epTitle").value || "script").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "script";
+  const blob = new Blob([$("scriptText").value], { type: "text/plain" });
+  const link = el("a", { href: URL.createObjectURL(blob), download: name + "-script.txt" });
+  document.body.append(link); link.click(); link.remove();
+  showToast("⬇️ Script downloaded! Check your Downloads.");
 });
 
 /* ---------- 4t. IDEA MASHUP ----------

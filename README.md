@@ -25,6 +25,8 @@
 
 **🖼️ Thumbnail maker** (in each planner card) — Press **Generate thumbnail** to draw a YouTube-size thumbnail from the card's title: big outlined words, your channel colors, and emoji stickers that match the title. **🎲 Shuffle** for a new look, change the big/small text, then **💾 Save to card** (a mini preview shows on the card) or **⬇️ Download** the picture. The dashed circle is a spot to add a photo of your face in any photo app.
 
+**📝 Script maker** (in each planner card) — Press **Generate script** to get a full video script made from the card: hook, intro, the challenge, rules, a section for each round (or each scene in your shot list), winner + punishment, and outro. Lines are shared between whoever is *Starring*, with filming tips in [brackets]. **🎲 New version** for different wording, edit anything, then **💾 Save to card**, **📋 Copy** or **⬇️ Download**.
+
 **👍👎 Voting** (Idea Bank, Shorts & Planner) — Give ideas and episodes a thumbs up or thumbs down (one vote each; tap again to take it back). Score = 👍 minus 👎, and the best scores float to the top. Needs your family code and your name (⚙️ Settings).
 
 **🔔 What's new** — When a sibling adds or moves a card, ticks a checklist, adds an idea, chats or comments, a line shows up in the What's new box at the top (even if the app was closed). Press **Got it ✓** to clear it.
