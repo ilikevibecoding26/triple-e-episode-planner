@@ -588,6 +588,7 @@
     <h2 id="epDialogTitle">Episode</h2>
     <label>Title</label><input id="epTitle" required maxlength="80">
     <label>Channel</label><select id="epChannel"><option>Gaming</option><option>Challenge</option></select>
+    <label class="check-item" style="margin-top:8px"><input type="checkbox" id="epShort"> <span>⚡ This is a Short (under 60 seconds)</span></label>
     <label>Status</label><select id="epStatus"></select>
     <div class="row" style="justify-content:flex-start;align-items:flex-end">
       <div style="flex:1 1 150px"><label for="epFilmDate">🎬 Film on</label><input type="date" id="epFilmDate"></div>
@@ -1124,14 +1125,17 @@ STAGES.forEach(s => $("epStatus").append(el("option", {}, s)));
 function openEpisode(ep, jumpToComments = false) {
   editingId = ep ? ep.id : null;
   $("epDialogTitle").textContent = ep ? "✏️ Edit episode" : "➕ New episode";
-  $("epTitle").value = ep ? ep.title : "";
-  $("epChannel").value = ep ? ep.channel : "Gaming";
-  $("epStatus").value = ep ? ep.status : "Idea";
-  $("epDesc").value = ep ? ep.desc : "";
-  $("epTitleOpts").value = ep ? ep.titleOpts : "";
-  $("epThumb").value = ep ? ep.thumb : "";
-  $("epHook").value = ep ? ep.hook : "";
-  $("epPunish").value = ep ? ep.punish : "";
+  // (ep && ep.x) || "" means: use it if the card has it, otherwise leave the box empty
+  // (without the || "", a missing note would show up as the word "undefined"!)
+  $("epTitle").value = (ep && ep.title) || "";
+  $("epChannel").value = (ep && ep.channel) || "Gaming";
+  $("epShort").checked = !!(ep && ep.isShort);
+  $("epStatus").value = (ep && ep.status) || "Idea";
+  $("epDesc").value = (ep && ep.desc) || "";
+  $("epTitleOpts").value = (ep && ep.titleOpts) || "";
+  $("epThumb").value = (ep && ep.thumb) || "";
+  $("epHook").value = (ep && ep.hook) || "";
+  $("epPunish").value = (ep && ep.punish) || "";
   $("epFilmDate").value = (ep && ep.filmDate) || "";
   $("epPostDate").value = (ep && ep.postDate) || "";
   draftJobs = ep && ep.jobs ? ep.jobs.map(j => ({ ...j })) : []; // a copy, so Cancel throws changes away
@@ -1170,7 +1174,7 @@ function deleteEpisode(id) {
 }
 $("epForm").addEventListener("submit", () => {
   const data = {
-    title: $("epTitle").value.trim(), channel: $("epChannel").value, status: $("epStatus").value, desc: $("epDesc").value.trim(),
+    title: $("epTitle").value.trim(), channel: $("epChannel").value, isShort: $("epShort").checked, status: $("epStatus").value, desc: $("epDesc").value.trim(),
     titleOpts: $("epTitleOpts").value, thumb: $("epThumb").value, hook: $("epHook").value, punish: $("epPunish").value,
     filmDate: $("epFilmDate").value, postDate: $("epPostDate").value, jobs: draftJobs, thumbStyle: draftThumb, script: draftScript
   };
@@ -2448,113 +2452,245 @@ $("thumbDownload").addEventListener("click", () => {
 let draftScript = "";  // the script for the card that's open
 let scriptSeed = 1;
 
-const SCRIPT_BITS = {
-  hooks: [
-    "{TITLE}... and only ONE of us can win!",
-    "We have NEVER done anything this crazy before. Today: {title}!",
-    "3 siblings. 1 challenge. Who's going to win {title}?",
-    "Okay, this might be our hardest video EVER.",
-    "Whoever loses today gets the WORST punishment. I can NOT lose!"
-  ],
-  explain: ["So here's the challenge: {desc}", "Okay, the rules are simple: {desc}", "Here's how it works: {desc}"],
-  rules: {
-    Challenge: ["no cheating!", "the judge's decision is FINAL.", "no touching each other!",
-                "have fun... but also WIN.", "if you break a rule, you're OUT!"],
-    Gaming: ["same gear, same time limit, no excuses!", "no breaking each other's stuff... probably.", "stay in the area we marked out.",
-             "the comments decide who really won!", "no looking at each other's screens!"]
-  },
-  roundStart: ["Three... two... one... GO!", "Okay, round {n}! Is everybody ready?", "Here we go, round {n}!", "Let's do this!"],
-  reactions: {
-    Challenge: ["Wait, WHAT just happened?!", "This is WAY harder than I thought!", "No way! You can't do that!", "I'm SO close!",
-                "Don't make me laugh, don't make me laugh...", "Okay okay, I've got a plan.", "That was SO funny!", "I'm not giving up!"],
-    Gaming: ["Wait, where did you GO?!", "My build is going to be SO good.", "Who put THAT there?!", "I'm almost out of time!",
-             "Okay, don't look at mine yet!", "That's actually genius.", "NOOO, I fell!", "I found diamonds!"]
-  },
-  tips: {
-    Challenge: ["[Close-up of everyone's faces]", "[Show the timer on screen]", "[Funny zoom-in + sound effect]", "[Slow-motion replay]", "[Cut to the judge's reaction]"],
-    Gaming: ["[Show everyone's screens side by side]", "[Zoom in on the build]", "[Show the timer on screen]", "[Funny zoom-in + sound effect]", "[Fly-through tour of the builds]"]
-  },
-  outro: ["If you want to see more videos like this, ask a grown-up to help you hit subscribe!",
-          "Comment down below who YOU think should have won!", "Which challenge should we do next? Tell us in the comments!",
-          "Thanks for watching, see you next time on {channel}!", "Bye everyone! Peace out!"]
+/* KINDS OF VIDEOS. The script maker reads the title + description and looks for words
+   (the "match" part) to guess what kind of video it is. Then it uses that kind's rules,
+   rounds, reactions and tips. Each matching word is a point (title words count double);
+   the kind with the most points wins. If there's a tie, the one higher in this list wins.
+   In rounds, {P1} {P2} {P3} become the names of the people starring. */
+const VIDEO_KINDS = [
+  { name: "hide and seek", match: /hide|seek|disguise/,
+    hooks: ["I found the BEST hiding spot ever... or did I?", "Ready or not, here we come!", "One seeker. Two hiders. Nowhere to run."],
+    rules: ["the seeker counts to 30 with their eyes CLOSED!", "no hiding in the same spot twice!", "the last one found wins!"],
+    rounds: ["{P1} counts, everyone hides!", "Searching...", "Close call!", "Found everyone?", "Switch: now {P2} is the seeker!"],
+    reactions: ["*whispering* I found the PERFECT spot...", "Ready or not, here I come!", "I can hear you breathing...", "FOUND YOU!",
+                "How did you NOT see me?!", "Shhh, they're right there!", "I've been here for like ten minutes..."],
+    tips: ["[Show where each person is hiding]", "[Spooky music while the seeker walks by]", "[Close-up of the hider trying not to laugh]"],
+    winner: ["The last one found was: ________ ", "Best hiding spot: ________ "] },
+  { name: "try not to laugh", match: /laugh|funny|serious|straight face/,
+    hooks: ["If you laugh, you LOSE. Let's go!", "I've NEVER been this serious in my life.", "Nobody laugh... NOBODY laugh..."],
+    rules: ["if you laugh, smile, or even smirk... you're out!", "no tickling!", "everyone gets a turn to be funny!"],
+    rounds: ["{P1}'s turn to be funny", "{P2}'s turn to be funny", "{P3}'s turn to be funny", "Sudden death!"],
+    reactions: ["Don't laugh... don't laugh...", "*snort*", "That's not even funny! *laughs*", "STRAIGHT FACE, STRAIGHT FACE!",
+                "You smiled! I saw you smile!", "Okay that one got me.", "I'm biting my cheeks so hard right now."],
+    tips: ["[Zoom in on whoever is trying not to laugh]", "[Slow-motion of the exact moment they crack]", "[Add a laugh-track sound effect]"],
+    winner: ["Last one with a straight face: ________ "] },
+  { name: "guessing", match: /guess|whisper|mystery|box|would you rather|quiz|what i built/,
+    hooks: ["Can we guess it? Let's find out!", "This is going to be SO confusing.", "There is NO way anyone gets this right."],
+    rules: ["you only get three guesses each time!", "no peeking!", "most correct answers wins!"],
+    rounds: ["Round 1: {P1}'s turn", "Round 2: {P2}'s turn", "Round 3: {P3}'s turn", "Final round: double points!"],
+    reactions: ["Is it... a banana?", "No WAY that's right!", "What did you SAY?!", "I have NO idea!", "Ewww, what is THAT?!",
+                "Okay, I've got this one.", "That's not fair, that was impossible!"],
+    tips: ["[Show the answer to the viewers first]", "[Answer: ________ ]", "[Pause: tell viewers to guess in the comments!]"],
+    winner: ["Score: ________ ", "Most correct guesses: ________ "] },
+  { name: "build", match: /build|house|base|fort|town|theme park|zoo|redstone|farm|recreate|island|contraption/,
+    hooks: ["We built the SAME thing. One of these is a disaster.", "You will not BELIEVE what we built.", "Same time limit, totally different builds."],
+    rules: ["everyone gets the same amount of time!", "no peeking at each other's builds!", "the judge picks the winner!"],
+    rounds: ["What are we building?", "Building time!", "Halfway check-in", "Final touches!", "Build tours", "Judging!"],
+    reactions: ["Don't look at mine!", "Okay, this is actually looking good.", "I'm running out of time!", "Wait... what IS that?",
+                "Mine has a secret room!", "That's not a house, that's a box!", "I'm adding one more thing..."],
+    tips: ["[Time-lapse of the building]", "[Tour of each build]", "[Before & after]", "[Show the timer on screen]"],
+    winner: ["Best build: ________ "] },
+  { name: "battle", match: /battle|pvp|spleef|arena|\bvs\b|versus|mob|fight|sabotage|tournament/,
+    hooks: ["Only ONE of us is walking away a winner.", "This is WAR. (A friendly war.)", "Best of three. No excuses. Let's GO."],
+    rules: ["same gear for everyone!", "best of three rounds wins!", "no crying if you lose! (okay, a little crying)"],
+    rounds: ["Getting ready", "Round 1", "Round 2", "Round 3: tie-breaker!"],
+    reactions: ["You're going DOWN!", "That was SO close!", "Rematch! REMATCH!", "Okay, that was lucky.", "Watch out behind you!",
+                "I'm not losing this time!", "GG... but I'm still winning the next one."],
+    tips: ["[Show the score on screen: ___ to ___]", "[Slow-mo of the winning move]", "[Epic battle music]"],
+    winner: ["Final score: ________ "] },
+  { name: "race", match: /race|speedrun|fastest|timed|seconds|lava|obstacle|parkour|relay|scavenger|hunt|maze|circle|last to leave/,
+    hooks: ["Who's the FASTEST? Let's find out!", "One mistake and it's OVER.", "We timed every single run. The results are crazy."],
+    rules: ["we time everyone with the challenge timer!", "if you mess up, you start over!", "no shortcuts!", "the best time wins!"],
+    rounds: ["Practice run", "{P1}'s turn", "{P2}'s turn", "{P3}'s turn", "Final showdown!"],
+    reactions: ["GO GO GO!", "Don't fall, don't fall...", "What's my time?!", "That was SO fast!", "I slipped!", "NEW RECORD!",
+                "You're cheating, that doesn't count!", "Okay, I'm doing that again."],
+    tips: ["[Show the ⏱️ timer on screen]", "[Slow-mo on the close calls]", "[Time: ________ ]", "[Split screen of everyone's runs]"],
+    winner: ["Times: ________ ", "Fastest: ________ "] },
+  { name: "survival", match: /surviv|hardcore|100 days|one block(?! type)|days|whatever we mine/,
+    hooks: ["Can we survive? We're about to find out.", "One mistake and we lose EVERYTHING.", "This did NOT go the way we planned."],
+    rules: ["if you die, you're out!", "we have to work together!", "no cheats, no creative mode!"],
+    rounds: ["Day 1: getting started", "The first night", "Our big goal", "Something goes WRONG", "Where we ended up"],
+    reactions: ["We need wood, NOW!", "It's getting dark...", "Creeper! CREEPER!", "We did it!!", "Don't die, don't die...",
+                "Who took all the food?!", "Okay, new plan."],
+    tips: ["[Show the day counter]", "[Dramatic music when things go wrong]", "[Recap montage]"],
+    winner: ["Did we survive? ________ "] },
+  { name: "show-off", match: /dance|copy|talent|sing|show|draw|drawing/,
+    hooks: ["Get ready for the CRAZIEST moves you've ever seen.", "We all have a secret talent... kind of.", "This is about to be SO cringe."],
+    rules: ["everyone gets a turn!", "no copying... unless it's a copy challenge!", "the judge's score is FINAL!"],
+    rounds: ["{P1}'s turn", "{P2}'s turn", "{P3}'s turn", "Everyone together!"],
+    reactions: ["Watch THIS!", "Wait, what was the second part?", "That's not even a real move!", "Nailed it!",
+                "Okay, I'm nervous.", "Do it again, do it again!", "That was AMAZING!"],
+    tips: ["[Show the judge's score card]", "[Wide shot so we see everything]", "[Funny sound effect]"],
+    winner: ["Scores: ________ "] },
+  { name: "contest", match: /contest|fishing|trading|target|airplane|balloon|throw|farthest|most|tier list/,
+    hooks: ["Who's going to win? Place your bets!", "This got WAY more intense than we thought.", "Three tries each. Make them count."],
+    rules: ["everyone gets three tries!", "we measure everything fairly!", "the best score wins!"],
+    rounds: ["Practice", "Round 1", "Round 2", "Final round!"],
+    reactions: ["Look how far that went!", "That doesn't count!", "Beat THAT!", "Nooooo!", "Okay, my turn!", "Is that a new record?!"],
+    tips: ["[Show the score on screen]", "[Slow-mo replay]", "[Score: ________ ]"],
+    winner: ["Best score: ________ "] },
+  { name: "day", match: /in charge|swap|roleplay|for a day|boss|a day/,
+    hooks: ["Today, things are going to be VERY different...", "I can't believe we agreed to this.", "Whatever they say, we HAVE to do it."],
+    rules: ["you have to do what the boss says!", "only safe, nice tasks!", "it lasts the WHOLE video!"],
+    rounds: ["The morning", "The first task", "Things get crazy", "The last task", "How did it go?"],
+    reactions: ["You HAVE to do what I say!", "This is SO unfair!", "Okay, that was actually fun.", "I want my room back!",
+                "Wait, I have to do WHAT?", "Best. Day. Ever."],
+    tips: ["[Clock on screen showing the time of day]", "[Montage of all the tasks]", "[Interview each person about it]"],
+    winner: ["Best moment: ________ "] }
+];
+// If nothing matches, use these
+const VIDEO_KIND_DEFAULT = {
+  name: "challenge",
+  hooks: ["{TITLE}... and only ONE of us can win!", "We have NEVER done anything like this before.", "3 siblings. 1 challenge. Who wins?"],
+  rules: { Challenge: ["no cheating!", "the judge's decision is FINAL!", "have fun... but also WIN!"],
+           Gaming: ["same gear, same time limit, no excuses!", "no breaking each other's stuff!", "the comments decide who really won!"] },
+  rounds: ["Round 1", "Round 2", "Final round"],
+  reactions: { Challenge: ["Wait, WHAT just happened?!", "This is WAY harder than I thought!", "No way! You can't do that!", "I'm SO close!", "Okay okay, I've got a plan."],
+               Gaming: ["Wait, where did you GO?!", "Who put THAT there?!", "I'm almost out of time!", "That's actually genius.", "NOOO, I fell!"] },
+  tips: ["[Close-up of everyone's faces]", "[Show the timer on screen]", "[Funny zoom-in + sound effect]"],
+  winner: ["Winner: ________ "]
 };
+const OUTROS = ["If you want to see more videos like this, ask a grown-up to help you hit subscribe!",
+  "Comment down below who YOU think should have won!", "Which video should we do next? Tell us in the comments!",
+  "Thanks for watching, see you next time on {channel}!", "Bye everyone! Peace out!"];
+const SHORT_ENDINGS = ["Comment who you think won!", "Should we do a part 2? Comment YES!", "Wait for it... *loops back to the start*",
+  "Which one would YOU pick? Comment below!"];
+
+// Which kind of video is this? Count each kind's words in the title (x2) and description (x1).
+function videoKind(title, desc) {
+  const count = (text, kind) => (text.toLowerCase().match(new RegExp(kind.match.source, "g")) || []).length;
+  let best = VIDEO_KIND_DEFAULT, bestScore = 0;
+  VIDEO_KINDS.forEach(kind => {
+    const score = count(title, kind) * 2 + count(desc, kind);
+    if (score > bestScore) { best = kind; bestScore = score; }
+  });
+  return best;
+}
+
+// Chop a description into sentences: "Do this; then that — and this." -> ["Do this.", "Then that.", "And this."]
+function descParts(desc) {
+  return desc.split(/[.;!?]|\s[—–-]\s/).map(p => p.trim()).filter(p => p.length > 3)
+    .map(p => p.charAt(0).toUpperCase() + p.slice(1) + ".");
+}
 
 function makeScript(seed) {
   const rand = seededRandom(seed);
   const pickR = list => list[Math.floor(rand() * list.length)];
+  // Take things out of a list one at a time, so nothing repeats until the list runs out
+  const bag = list => { let left = []; return () => { if (!left.length) left = [...list]; return left.splice(Math.floor(rand() * left.length), 1)[0]; }; };
+
   const channel = $("epChannel").value;
+  const isShort = $("epShort").checked;
   const title = $("epTitle").value.trim() || "Our New Video";
-  const desc = $("epDesc").value.trim() || "(describe the challenge here!)";
+  const desc = $("epDesc").value.trim();
   const hook = $("epHook").value.trim();
   const punishment = $("epPunish").value.trim() || pickR(PUNISHMENTS);
-  // Who's in the video? People with the "Starring" job, or else everyone we know, or else placeholders
+  const kind = videoKind(title, desc);
+  const forChannel = x => Array.isArray(x) ? x : (x[channel] || x.Challenge); // some lists are different for Gaming / Challenge
+  const parts = descParts(desc);
+  // Bits of the description that sound like rules ("no...", "without...", "only...") become rules too
+  const descRules = parts.filter(p => /\b(no|not|without|only|can't|cannot|never|must|have to|last one)\b/i.test(p));
+
+  // Who's in it? People "Starring", or else everyone we know, or else placeholders. No repeats ("Sam" = "sam").
   let cast = draftJobs.filter(j => j.what === "Starring").map(j => j.who);
   if (!cast.length) cast = familyNames();
   if (!cast.length) cast = ["Sibling 1", "Sibling 2", "Sibling 3"];
-  // Remove repeats, even if the capitals are different ("Edie" and "edie" are the same person)
   cast = cast.filter((name, i) => cast.findIndex(n => n.toLowerCase() === name.toLowerCase()) === i);
   let turn = Math.floor(rand() * cast.length);
-  const who = () => cast[turn++ % cast.length].toUpperCase(); // takes turns talking
-  const fill = text => text.replace("{TITLE}", title.toUpperCase()).replace("{title}", title).replace("{desc}", desc)
-    .replace("{punishment}", punishment).replace("{channel}", channelName());
+  const who = () => cast[turn++ % cast.length].toUpperCase(); // people take turns talking
+  const fill = text => text.replace("{TITLE}", title.toUpperCase()).replace("{title}", title).replace("{channel}", channelName())
+    .replace("{P1}", cast[0]).replace("{P2}", cast[1 % cast.length]).replace("{P3}", cast[2 % cast.length]);
   const say = text => who() + ": " + fill(text);
+  const reaction = bag(forChannel(kind.reactions));
+  const tip = bag(forChannel(kind.tips));
+  const hookLine = hook ? cast[0].toUpperCase() + ": " + hook : say(pickR(kind.hooks));
 
   const lines = [];
   const section = name => { lines.push(""); lines.push("=== " + name + " ==="); };
+
+  // ---------------- ⚡ SHORT: under 60 seconds, filmed tall ----------------
+  if (isShort) {
+    lines.push("⚡ SHORT SCRIPT: " + title.toUpperCase());
+    lines.push("Channel: " + channel + " · Starring: " + cast.join(", ") + " · Kind of video: " + kind.name);
+    lines.push("About 45–60 seconds. Film it TALL (phone held up and down)! Fast cuts, no pauses.");
+    section("0–3 sec: HOOK");
+    lines.push(hookLine);
+    lines.push("[Big words on screen: " + title.toUpperCase() + "]");
+    section("3–10 sec: SETUP");
+    lines.push(say(parts[0] || "Here's the challenge: " + title + "!"));
+    if (descRules[0] && descRules[0] !== parts[0]) lines.push(say("But " + descRules[0].charAt(0).toLowerCase() + descRules[0].slice(1)));
+    section("10–45 sec: ACTION");
+    lines.push("[Quick cut]  " + say(reaction()));
+    lines.push("[Quick cut]  " + say(reaction()));
+    lines.push(tip());
+    lines.push("[Quick cut]  " + say(reaction()));
+    section("45–55 sec: PAYOFF");
+    lines.push("[Freeze frame on the best reaction!]");
+    lines.push(kind.winner.map(w => "[" + w.trim() + "]").join("  "));
+    section("55–60 sec: ENDING");
+    lines.push(say(pickR(SHORT_ENDINGS)));
+    lines.push("[Tip: end on something that makes people want to watch it again!]");
+    return lines.join("\n");
+  }
+
+  // ---------------- 🎬 FULL VIDEO ----------------
   lines.push("SCRIPT: " + title.toUpperCase());
-  lines.push("Channel: " + channel + " · Starring: " + cast.join(", "));
+  lines.push("Channel: " + channel + " · Starring: " + cast.join(", ") + " · Kind of video: " + kind.name);
 
   section("1. HOOK (first 5 seconds!)");
-  lines.push(hook ? cast[0].toUpperCase() + ": " + hook : say(pickR(SCRIPT_BITS.hooks)));
-  lines.push(pickR(SCRIPT_BITS.tips[channel] || SCRIPT_BITS.tips.Challenge));
+  lines.push(hookLine);
+  lines.push(tip());
 
   section("2. INTRO");
   lines.push(say(pickR(INTROS).replace("Triple E Studios", channelName())));
+  lines.push(say("Today we're doing... " + title.toUpperCase() + "!"));
 
   section("3. THE CHALLENGE");
-  lines.push(say(pickR(SCRIPT_BITS.explain)));
+  if (parts.length) {
+    lines.push(say("So here's how it works. " + parts[0]));
+    parts.slice(1).forEach(p => lines.push(say(p)));
+  } else {
+    lines.push(say("So here's how it works... (explain the challenge here!)"));
+  }
   lines.push(say("And whoever loses gets a punishment: " + punishment + "!"));
   lines.push(who() + ": Oh no...");
 
   section("4. RULES");
-  const rules = [...(SCRIPT_BITS.rules[channel] || SCRIPT_BITS.rules.Challenge)];
-  ["one", "two", "three"].forEach(num => lines.push(say("Rule number " + num + ": " + rules.splice(Math.floor(rand() * rules.length), 1)[0])));
+  // Rules from the description first (they're the most specific), then the kind's rules, 3 total
+  // (skipping the first sentence, since we just said it in THE CHALLENGE)
+  const rules = [...new Set([...descRules.filter(r => r !== parts[0]).map(r => r.charAt(0).toLowerCase() + r.slice(1)),
+                             ...forChannel(kind.rules)])].slice(0, 3);
+  ["one", "two", "three"].slice(0, rules.length).forEach((num, i) => lines.push(say("Rule number " + num + ": " + rules[i])));
 
-  // Rounds: use the shot list's middle scenes if there is one, otherwise 3 rounds
+  // Rounds: the shot list's middle scenes if there are any, otherwise this kind of video's rounds
   const card = openCard();
   const shots = ((card && card.shots) || []).map(s => s.text)
     .filter(t => !/intro|hook|rules|outro|subscribe|winner|punishment/i.test(t));
-  const rounds = shots.length ? shots : ["Round 1", "Round 2", "Final round"];
-  // Each reaction gets used once before any of them repeat
-  let reactions = [];
-  const nextReaction = () => {
-    if (!reactions.length) reactions = [...(SCRIPT_BITS.reactions[channel] || SCRIPT_BITS.reactions.Challenge)];
-    return reactions.splice(Math.floor(rand() * reactions.length), 1)[0];
-  };
+  const rounds = shots.length ? shots : kind.rounds.map(fill).filter((r, i, all) => all.indexOf(r) === i);
   rounds.forEach((name, i) => {
     section((5 + i) + ". " + name.toUpperCase());
-    lines.push(say(pickR(SCRIPT_BITS.roundStart).replace("{n}", i + 1)));
-    lines.push(pickR(SCRIPT_BITS.tips[channel] || SCRIPT_BITS.tips.Challenge));
-    for (let r = 0; r < 2; r++) lines.push(say(nextReaction()));
+    lines.push(say(reaction()));
+    lines.push(tip());
+    lines.push(say(reaction()));
     lines.push("[What actually happens: ______________________ ]");
   });
 
   const n = 5 + rounds.length;
   section(n + ". WINNER + PUNISHMENT");
   lines.push("[Drumroll... dramatic music!]");
+  kind.winner.forEach(w => lines.push("[" + w.trim() + "]"));
   lines.push(say("And the winner is..."));
-  lines.push("[WINNER: ________ ]   [LOSER: ________ ]");
   lines.push(say("Time for the punishment: " + punishment + "!"));
-  lines.push("[Film the punishment, then add it to the 🏆 Scoreboard!]");
+  lines.push("[Film the punishment, then add the winner to the 🏆 Scoreboard!]");
 
   section((n + 1) + ". OUTRO");
-  const outros = [...SCRIPT_BITS.outro];
-  for (let i = 0; i < 3; i++) lines.push(say(outros.splice(Math.floor(rand() * outros.length), 1)[0]));
+  const outro = bag(OUTROS);
+  for (let i = 0; i < 3; i++) lines.push(say(outro()));
 
-  // About how long is it? People talk about 150 words a minute; add time for the action
+  // About how long? People talk about 150 words a minute, plus time for the action
   const words = lines.join(" ").split(/\s+/).length;
-  const minutes = Math.max(1, Math.round(words / 150 + rounds.length * 1.5));
-  lines.splice(2, 0, "About " + minutes + " minute" + (minutes === 1 ? "" : "s") + " long (plus however long the challenge takes!)");
+  const minutes = Math.max(2, Math.round(words / 150 + rounds.length * 1.5));
+  lines.splice(2, 0, "About " + minutes + " minutes long (plus however long the challenge takes!)");
   return lines.join("\n");
 }
 
