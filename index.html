@@ -334,6 +334,16 @@
         <button class="btn small ghost" id="familyLeaveBtn">Disconnect this device</button>
       </div>
     </div>
+    <div class="panel center">
+      <h2>📦 Share &amp; Backup</h2>
+      <p>Save everything to a file to send to your siblings (or keep as a backup). They can load it into their copy.</p>
+      <div class="row">
+        <button class="btn green" id="exportBtn">⬇️ Export my planner</button>
+        <button class="btn purple" id="importBtn">⬆️ Import a planner file</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </div>
+      <p><small>Importing <b>adds</b> the new ideas and cards to yours. Nothing you have gets erased; if the same card is in both, the imported one wins.</small></p>
+    </div>
     <div class="panel">
       <h2 class="center" style="margin-top:0">⚙️ Settings</h2>
       <div class="setting" style="flex-wrap:wrap">
@@ -392,16 +402,6 @@
       <p>Formula: <b>[Who] + [What challenge] + [Curiosity hook]</b></p>
       <div id="titleOut">Press the button!</div>
       <button class="btn big purple" id="titleBtn">✨ Make a title</button>
-    </div>
-    <div class="panel center">
-      <h2>📦 Share &amp; Backup</h2>
-      <p>Save everything to a file to send to your siblings (or keep as a backup). They can load it into their copy.</p>
-      <div class="row">
-        <button class="btn green" id="exportBtn">⬇️ Export my planner</button>
-        <button class="btn purple" id="importBtn">⬆️ Import a planner file</button>
-        <input type="file" id="importFile" accept=".json,application/json" hidden>
-      </div>
-      <p><small>Importing <b>adds</b> the new ideas and cards to yours. Nothing you have gets erased; if the same card is in both, the imported one wins.</small></p>
     </div>
     <div class="panel center">
       <h2>🎤 Intro line picker</h2>
