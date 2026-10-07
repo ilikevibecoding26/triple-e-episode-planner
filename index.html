@@ -736,7 +736,8 @@ function renderBoard() {
         el("div", { class: "moves" },
           el("button", { class: "btn small ghost", onclick: () => shift(ep, -1) }, "◀"),
           el("button", { class: "btn small ghost", onclick: () => openEpisode(ep) }, "✏️"),
-          el("button", { class: "btn small ghost", title: "Comments", onclick: () => openEpisode(ep, true) }, "💬" + commentCountLabel(ep.id)),
+          // the 💬 button turns pink with a number when a sibling left a comment you haven't read
+          el("button", { class: "btn small " + (unreadComments(ep.id) ? "" : "ghost"), title: "Comments", onclick: () => openEpisode(ep, true) }, "💬" + commentCountLabel(ep.id)),
           el("button", { class: "btn small green", onclick: () => shift(ep, +1) }, "▶")
         ));
       card.addEventListener("dragstart", e => e.dataTransfer.setData("text/plain", ep.id));
@@ -764,6 +765,7 @@ function openEpisode(ep, jumpToComments = false) {
   $("epPunish").value = ep ? ep.punish : "";
   $("epDelete").hidden = !ep;
   renderComments();
+  if (ep) markCommentsSeen(ep.id);
   $("epDialog").showModal();
   if (jumpToComments) { $("epComments").scrollIntoView(); $("commentText").focus(); }
   else $("epDialog").scrollTop = 0;
@@ -1136,10 +1138,28 @@ let lastCommentId = 0;
 
 function resetComments() { commentsByCard = {}; lastCommentId = 0; renderBoard(); renderComments(); }
 
-// "✏️ notes 💬2" — shows how many comments a card has
+// We remember, for each card, the newest comment number you've already seen.
+// Anything newer, written by someone else, counts as "unread".
+let seenComments = load("tes_seen_comments", {});
+
+function unreadComments(cardId) {
+  const seen = seenComments[cardId] || 0;
+  return (commentsByCard[cardId] || []).filter(c => c.id > seen && c.name !== chatName).length;
+}
+
+// "💬 2" = 2 new comments from your siblings. Your own comments don't count.
 function commentCountLabel(cardId) {
-  const n = (commentsByCard[cardId] || []).length;
+  const n = unreadComments(cardId);
   return n ? " " + n : "";
+}
+
+// Opening a card's comments marks them all as read
+function markCommentsSeen(cardId) {
+  const list = commentsByCard[cardId] || [];
+  if (!list.length) return;
+  seenComments[cardId] = list[list.length - 1].id;
+  save("tes_seen_comments", seenComments);
+  renderBoard();
 }
 
 // Draw the comments for the card that's open in the pop-up
@@ -1170,7 +1190,7 @@ async function pullComments() {
       lastCommentId = c.id;
     });
     renderBoard(); // update the 💬 counts
-    if ($("epDialog").open) renderComments();
+    if ($("epDialog").open) { renderComments(); markCommentsSeen(editingId); }
   } catch (e) { /* offline: try again next tick */ }
 }
 
