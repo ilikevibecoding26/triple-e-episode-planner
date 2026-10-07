@@ -128,6 +128,20 @@
   #commentList .msg { max-width: 100%; }
   #commentList:empty::before { content: "No comments yet — what do you think of this idea? 🤔"; display: block; opacity: .6; text-align: center; padding: 8px; }
   .badge { background: var(--pink); color: white; border-radius: 999px; padding: 0 7px; font-size: .8rem; }
+  /* ---- Settings: sliding on/off switch ----
+     It's really a checkbox hidden underneath; the "slider" is drawn on top of it. */
+  .setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; border: 3px solid var(--ink); border-radius: 16px; }
+  .setting-name { font-weight: bold; font-size: 1.15rem; }
+  .setting-help { font-size: .85rem; opacity: .75; }
+  .switch { position: relative; flex: none; width: 64px; height: 36px; margin: 0; cursor: pointer; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .slider { position: absolute; inset: 0; background: #cbd5e1; border: 3px solid var(--ink); border-radius: 999px; transition: background .2s; }
+  .slider::before { content: ""; position: absolute; width: 24px; height: 24px; left: 3px; top: 3px; background: white; border: 2px solid var(--ink); border-radius: 50%; transition: transform .2s; box-sizing: border-box; }
+  .switch input:checked + .slider { background: var(--gaming); }
+  .switch input:checked + .slider::before { transform: translateX(28px); }
+  .switch input:focus-visible + .slider { outline: 3px solid var(--purple); outline-offset: 2px; }
+  html.no-emoji #chatList:empty::before { content: "No messages yet — be the first to say hi!"; }
+  html.no-emoji #commentList:empty::before { content: "No comments yet — what do you think of this idea?"; }
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 120px); z-index: 10;
     background: var(--gaming); color: white; font-weight: bold; padding: 14px 22px;
@@ -153,6 +167,7 @@
   <button class="tab" data-page="planner">📋 Planner</button>
   <button class="tab" data-page="chat">💬 Chat <span id="chatBadge" class="badge" hidden></span></button>
   <button class="tab" data-page="extras">🎉 Fun Extras</button>
+  <button class="tab" data-page="settings" title="Settings">⚙️ Settings</button>
 </nav>
 
 <main>
@@ -256,6 +271,24 @@
           <button class="btn green" type="submit">Send</button>
         </form>
         <p class="center"><small>Only people with your family code can see this chat. Be kind! 💖</small></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== SETTINGS ===================== -->
+  <section class="page" id="page-settings">
+    <div class="panel">
+      <h2 class="center" style="margin-top:0">⚙️ Settings</h2>
+      <p class="center"><small>These settings are just for <b>you</b>, on this device. They don't change anything for your siblings.</small></p>
+      <div class="setting">
+        <div>
+          <div class="setting-name">😀 Show emojis</div>
+          <div class="setting-help">Turn this off if all the emojis are too much. Your ideas and messages don't change; emojis are just hidden.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="emojiToggle" role="switch" aria-label="Show emojis">
+          <span class="slider"></span>
+        </label>
       </div>
     </div>
   </section>
@@ -531,6 +564,7 @@ const chip = channel => el("span", { class: "chip " + channel }, channel === "Ga
 document.querySelectorAll("button.tab").forEach(btn => btn.addEventListener("click", () => {
   document.querySelectorAll("button.tab").forEach(b => b.classList.toggle("active", b === btn));
   document.querySelectorAll("section.page").forEach(s => s.classList.toggle("active", s.id === "page-" + btn.dataset.page));
+  save("tes_tab", btn.dataset.page);
 }));
 
 /* ---------- Stats line ---------- */
@@ -611,7 +645,7 @@ function renderBank() {
     el("div", { class: "row", style: "justify-content:flex-start" },
       el("button", { class: "btn small green", onclick: () => addEpisode({ title: idea.title, channel: idea.channel, desc: idea.desc }) }, "📋 Plan it"),
       el("button", { class: "btn small ghost", onclick: () => { idea.used = !idea.used; saveAll(); } }, idea.used ? "↩️ Not done" : "✅ Did it"),
-      el("button", { class: "btn small orange", onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => { ideas = ideas.filter(i => i.id !== idea.id); saveAll(); }) }, "🗑️")
+      el("button", { class: "btn small orange", title: "Delete", onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => { ideas = ideas.filter(i => i.id !== idea.id); saveAll(); }) }, "🗑️")
     )
   )));
 }
@@ -668,7 +702,7 @@ function renderShorts() {
     el("div", { class: "row", style: "justify-content:flex-start" },
       el("button", { class: "btn small green", onclick: () => addEpisode({ title: s.title, channel: s.channel, desc: s.desc, isShort: true }) }, "📋 Plan it"),
       el("button", { class: "btn small ghost", onclick: () => { s.used = !s.used; saveAll(); } }, s.used ? "↩️ Not done" : "✅ Did it"),
-      el("button", { class: "btn small orange", onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => { shorts = shorts.filter(x => x.id !== s.id); saveAll(); }) }, "🗑️")
+      el("button", { class: "btn small orange", title: "Delete", onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => { shorts = shorts.filter(x => x.id !== s.id); saveAll(); }) }, "🗑️")
     )
   )));
 }
@@ -735,9 +769,9 @@ function renderBoard() {
         el("p", {}, ep.desc),
         el("div", { class: "moves" },
           el("button", { class: "btn small ghost", onclick: () => shift(ep, -1) }, "◀"),
-          el("button", { class: "btn small ghost", onclick: () => openEpisode(ep) }, "✏️"),
+          el("button", { class: "btn small ghost", title: "Edit", onclick: () => openEpisode(ep) }, "✏️"),
           // the 💬 button turns pink with a number when a sibling left a comment you haven't read
-          el("button", { class: "btn small " + (unreadComments(ep.id) ? "" : "ghost"), title: "Comments", onclick: () => openEpisode(ep, true) }, "💬" + commentCountLabel(ep.id)),
+          el("button", { class: "btn small " + (unreadComments(ep.id) ? "" : "ghost"), title: "Comments", onclick: () => openEpisode(ep, true) }, (emojisOn ? "💬" : "Comments") + commentCountLabel(ep.id)),
           el("button", { class: "btn small green", onclick: () => shift(ep, +1) }, "▶")
         ));
       card.addEventListener("dragstart", e => e.dataTransfer.setData("text/plain", ep.id));
@@ -1215,9 +1249,59 @@ $("commentForm").addEventListener("submit", async e => {
 setInterval(() => { pushChanges(); pullChanges(); pullMessages(); pullComments(); }, 5000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { pullChanges(); pullMessages(); pullComments(); } });
 
+/* ---------- 4i. SETTINGS: EMOJI ON/OFF ----------
+   When emojis are OFF we don't change any saved data. Instead we "clean"
+   the words on the screen: find every bit of text, take the emojis out.
+   A MutationObserver is a helper that tells us whenever new stuff appears
+   on the page (a new message, a re-drawn card...) so we can clean that too. */
+let emojisOn = load("tes_emojis", true); // default: emojis ON
+
+// Emoji characters, plus the invisible "glue" characters some emojis use, plus one space after.
+// \p{Extended_Pictographic} is a built-in "is this an emoji?" test.
+const EMOJI = /(\p{Extended_Pictographic}|\p{Regional_Indicator})[\uFE0F\u200D\u20E3\p{Emoji_Modifier}\p{Extended_Pictographic}]*\s?/gu;
+const KEEP = ["◀", "▶"]; // these arrows count as emojis, but we need them for moving cards!
+
+function removeEmojis(text) {
+  return text.replace(EMOJI, match => KEEP.includes(match.trim()) ? match : "");
+}
+
+function cleanTextNode(node) {
+  const parent = node.parentElement;
+  if (!parent || parent.closest("script, style, textarea")) return;
+  const cleaned = removeEmojis(node.nodeValue);
+  if (cleaned === node.nodeValue) return;
+  // A button that was ONLY an emoji (like 🗑️) would be blank, so show its word instead
+  node.nodeValue = cleaned.trim() === "" && parent.title && parent.childNodes.length === 1 ? parent.title : cleaned;
+}
+
+function cleanEverything(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) cleanTextNode(walker.currentNode);
+  root.querySelectorAll?.("[placeholder]").forEach(box => { box.placeholder = removeEmojis(box.placeholder); });
+}
+
+if (!emojisOn) document.documentElement.classList.add("no-emoji");
+$("emojiToggle").checked = emojisOn;
+$("emojiToggle").addEventListener("change", () => {
+  save("tes_emojis", $("emojiToggle").checked);
+  location.reload(); // simplest way to redraw everything with the new setting
+});
+
 /* ---------- Draw everything ---------- */
 function renderAll() { renderStats(); renderBank(); renderShorts(); renderBoard(); }
 renderAll();
+
+// Open the tab you were on last time
+const lastTab = document.querySelector('button.tab[data-page="' + load("tes_tab", "spin") + '"]');
+if (lastTab) lastTab.click();
+
+if (!emojisOn) {
+  cleanEverything(document.body);
+  new MutationObserver(changes => changes.forEach(change => {
+    if (change.type === "characterData") cleanTextNode(change.target);
+    change.addedNodes.forEach(n => n.nodeType === Node.TEXT_NODE ? cleanTextNode(n) : cleanEverything(n));
+  })).observe(document.body, { childList: true, characterData: true, subtree: true });
+}
 renderSync();
 pullChanges();
 pullMessages();

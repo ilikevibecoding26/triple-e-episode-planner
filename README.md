@@ -29,6 +29,8 @@
 
 **💬 Chat** — Once you're connected with your family code, talk about what you're planning! Type your name once, then chat. A pink number on the Chat tab means new messages.
 
+**⚙️ Settings** — Just for you, on your device. Flip the **Show emojis** switch off if all the emojis get annoying (it's on by default). Nothing you saved changes; emojis are just hidden.
+
 The stats line at the top shows how many ideas are banked and where your episodes are.
 
 ## For the coder 💻
