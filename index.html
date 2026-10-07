@@ -172,6 +172,7 @@
   .check-item.done span { text-decoration: line-through; opacity: .6; }
   .check-item button { border: none; background: none; color: var(--ink); cursor: pointer; opacity: .5; font-size: 1rem; }
   #epChecklist, #checkOff { border-top: 3px dashed var(--ink); margin-top: 8px; }
+  .votes { display: inline-flex; gap: 4px; }
   .soon-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 2px solid var(--ink); border-radius: 12px; margin: 6px 0; cursor: pointer; background: var(--card-alt); }
   .soon-day { font-weight: bold; min-width: 96px; }
   #toast {
@@ -739,7 +740,7 @@ function renderBank() {
     el("h3", {}, idea.title),
     el("p", {}, idea.desc),
     el("div", { class: "row", style: "justify-content:flex-start" },
-      voteButton(idea),
+      voteButtons(idea),
       el("button", { class: "btn small green", onclick: () => addEpisode({ title: idea.title, channel: idea.channel, desc: idea.desc }) }, "📋 Plan it"),
       el("button", { class: "btn small ghost", onclick: () => { idea.used = !idea.used; saveAll(); } }, idea.used ? "↩️ Not done" : "✅ Did it"),
       el("button", { class: "btn small orange", title: "Delete", onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => { ideas = ideas.filter(i => i.id !== idea.id); saveAll(); }) }, "🗑️")
@@ -797,7 +798,7 @@ function renderShorts() {
     el("h3", {}, s.title),
     el("p", {}, s.desc),
     el("div", { class: "row", style: "justify-content:flex-start" },
-      voteButton(s),
+      voteButtons(s),
       el("button", { class: "btn small green", onclick: () => addEpisode({ title: s.title, channel: s.channel, desc: s.desc, isShort: true }) }, "📋 Plan it"),
       el("button", { class: "btn small ghost", onclick: () => { s.used = !s.used; saveAll(); } }, s.used ? "↩️ Not done" : "✅ Did it"),
       el("button", { class: "btn small orange", title: "Delete", onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => { shorts = shorts.filter(x => x.id !== s.id); saveAll(); }) }, "🗑️")
@@ -865,7 +866,7 @@ function renderBoard() {
         // little trash can in the top-right corner (tap twice to delete)
         el("button", { class: "btn small orange", style: "float:right", title: "Delete card",
           onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => deleteEpisode(ep.id)) }, "🗑️"),
-        voteButton(ep, "float:right;margin-right:4px"),
+        voteButtons(ep, "float:right;margin-right:4px"),
         chip(ep.channel), ep.isShort ? el("span", { class: "chip Short" }, "⚡ Short") : "",
         el("h4", { onclick: () => openEpisode(ep) }, ep.title),
         el("p", {}, ep.desc),
@@ -1632,49 +1633,69 @@ $("checkForm").addEventListener("submit", e => {
   saveAll();
 });
 
-/* ---------- 4p. IDEA VOTING ----------
-   Votes live in their own database table: one row per (idea, person).
-   votesByItem looks like { ideaId: ["Big Sis", "Little Bro"] } */
+/* ---------- 4p. VOTING (thumbs up + thumbs down) ----------
+   Votes live in their own database table: one row per (idea, person), with
+   value 1 for 👍 or -1 for 👎. So each person gets ONE vote per idea.
+   votesByItem looks like { ideaId: { up: ["Big Sis"], down: ["Little Bro"] } } */
 let votesByItem = {};
+
+function votesFor(id) { return votesByItem[id] || { up: [], down: [] }; }
+// The score is ups minus downs: 2 👍 and 1 👎 = a score of 1
+function score(id) { const v = votesFor(id); return v.up.length - v.down.length; }
 
 async function pullVotes() {
   if (!familyCode) return;
   try {
-    const rows = await callDb("get_votes", { code: familyCode });
+    const rows = await callDb("get_all_votes", { code: familyCode });
     const next = {};
-    rows.forEach(r => (next[r.item_id] = next[r.item_id] || []).push(r.voter));
+    rows.forEach(r => {
+      next[r.item_id] = next[r.item_id] || { up: [], down: [] };
+      next[r.item_id][r.value > 0 ? "up" : "down"].push(r.voter);
+    });
     if (JSON.stringify(next) === JSON.stringify(votesByItem)) return; // nothing changed
     votesByItem = next;
     renderBank(); renderShorts(); renderBoard();
   } catch (e) { /* offline: try later */ }
 }
 
-// Most votes first. Ideas with the same number of votes keep their normal order.
+// Best score first. Ideas with the same score keep their normal order.
 function byVotes(list) {
-  return list.map((item, i) => ({ item, i })).sort((a, b) =>
-    ((votesByItem[b.item.id] || []).length - (votesByItem[a.item.id] || []).length) || a.i - b.i).map(x => x.item);
+  return list.map((item, i) => ({ item, i }))
+    .sort((a, b) => (score(b.item.id) - score(a.item.id)) || a.i - b.i)
+    .map(x => x.item);
 }
 
-function voteButton(idea, style = "") {
-  const voters = votesByItem[idea.id] || [];
-  const iVoted = voters.includes(myName());
-  return el("button", {
-    class: "btn small " + (iVoted ? "" : "ghost"), // pink when YOU voted for it
-    style,
-    title: voters.length ? "Votes: " + voters.join(", ") : "Vote for this idea!",
-    onclick: () => toggleVote(idea)
-  }, ico("👍", "Vote") + (voters.length ? " " + voters.length : ""));
+// The 👍 and 👎 buttons, side by side
+function voteButtons(idea, style = "") {
+  const v = votesFor(idea.id);
+  const mine = v.up.includes(myName()) ? 1 : v.down.includes(myName()) ? -1 : 0;
+  const up = el("button", {
+    class: "btn small " + (mine === 1 ? "" : "ghost"),        // pink when YOU gave a 👍
+    title: v.up.length ? "Thumbs up: " + v.up.join(", ") : "Thumbs up!",
+    onclick: () => castVote(idea, 1)
+  }, ico("👍", "Up") + (v.up.length ? " " + v.up.length : ""));
+  const down = el("button", {
+    class: "btn small " + (mine === -1 ? "purple" : "ghost"), // purple when YOU gave a 👎
+    title: v.down.length ? "Thumbs down: " + v.down.join(", ") : "Thumbs down",
+    onclick: () => castVote(idea, -1)
+  }, ico("👎", "Down") + (v.down.length ? " " + v.down.length : ""));
+  return el("span", { class: "votes", style }, up, down);
 }
 
-async function toggleVote(idea) {
+// Tap 👍 (value 1) or 👎 (value -1). Tapping the one you already picked takes your vote back.
+async function castVote(idea, value) {
   if (!familyCode) { showToast("🔗 Connect with your family code (Fun Extras) to vote!"); return; }
   if (!myName()) { showToast("👤 Set your name in ⚙️ Settings first, so we know who voted!"); return; }
-  const voters = votesByItem[idea.id] || [];
-  const up = !voters.includes(myName());
+  const v = votesFor(idea.id);
+  const current = v.up.includes(myName()) ? 1 : v.down.includes(myName()) ? -1 : 0;
+  const newValue = current === value ? 0 : value;
   // Update the screen right away, then tell the database
-  votesByItem[idea.id] = up ? [...voters, myName()] : voters.filter(v => v !== myName());
+  const up = v.up.filter(n => n !== myName()), down = v.down.filter(n => n !== myName());
+  if (newValue === 1) up.push(myName());
+  if (newValue === -1) down.push(myName());
+  votesByItem[idea.id] = { up, down };
   renderBank(); renderShorts(); renderBoard();
-  try { await callDb("set_vote", { code: familyCode, item_id: idea.id, voter: myName(), up }); }
+  try { await callDb("cast_vote", { code: familyCode, item_id: idea.id, voter: myName(), value: newValue }); }
   catch (e) { showToast("😕 Vote didn't save. Check your internet!"); }
   pullVotes();
 }
