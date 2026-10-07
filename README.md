@@ -25,7 +25,9 @@
 
 **👍👎 Voting** (Idea Bank, Shorts & Planner) — Give ideas and episodes a thumbs up or thumbs down (one vote each; tap again to take it back). Score = 👍 minus 👎, and the best scores float to the top. Needs your family code and your name (⚙️ Settings).
 
-**🎉 Fun Extras** — Punishment picker, a title helper (*Who + What + Hook*), and a random intro-line picker.
+**🔔 What's new** — When a sibling adds or moves a card, ticks a checklist, adds an idea, chats or comments, a line shows up in the What's new box at the top (even if the app was closed). Press **Got it ✓** to clear it.
+
+**🎉 Fun Extras** — A spinning punishment wheel, a title helper (*Who + What + Hook*), and a random intro-line picker.
 
 **📦 Share & Backup** (in ⚙️ Settings) — Export everything to a file as a backup, or import a file from a sibling.
 

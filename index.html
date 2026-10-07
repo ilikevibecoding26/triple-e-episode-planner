@@ -175,6 +175,15 @@
   .votes { display: inline-flex; gap: 4px; }
   .soon-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 2px solid var(--ink); border-radius: 12px; margin: 6px 0; cursor: pointer; background: var(--card-alt); }
   .soon-day { font-weight: bold; min-width: 96px; }
+  /* ---- What's new ---- */
+  #newsPanel { border-color: var(--pink); }
+  #newsList { margin: 8px 0 0; padding-left: 0; list-style: none; max-height: 240px; overflow-y: auto; }
+  #newsList li { padding: 6px 0; border-bottom: 2px dashed var(--purple-soft); }
+  #newsList .when { font-size: .75rem; opacity: .6; margin-left: 6px; }
+  /* ---- Punishment wheel ---- */
+  .wheel-wrap { position: relative; width: min(340px, 85vw); margin: 10px auto 0; }
+  #wheel { width: 100%; height: auto; display: block; border-radius: 50%; border: 5px solid var(--ink); box-sizing: border-box; }
+  .wheel-pointer { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 2.2rem; color: var(--ink); z-index: 1; text-shadow: 0 2px 0 var(--bg); }
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, calc(100% + 40px)); opacity: 0; z-index: 10;
     background: var(--gaming); color: white; font-weight: bold; padding: 14px 22px;
@@ -204,6 +213,14 @@
 </nav>
 
 <main>
+  <!-- 🔔 What's new: shows up when a sibling changed something -->
+  <div class="panel" id="newsPanel" hidden>
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">🔔 What's new <span id="newsCount"></span></h2>
+      <button class="btn small green" id="newsClear">Got it ✓</button>
+    </div>
+    <ul id="newsList"></ul>
+  </div>
 
   <!-- ===================== SPIN ===================== -->
   <section class="page active" id="page-spin">
@@ -395,8 +412,12 @@
   <section class="page" id="page-extras">
     <div class="panel center">
       <h2>😈 Punishment Picker</h2>
-      <div id="punishBox">Who lost? Press the button!</div>
-      <button class="btn big orange" id="punishBtn">🎡 Spin the punishment!</button>
+      <div class="wheel-wrap">
+        <div class="wheel-pointer">▼</div>
+        <canvas id="wheel" width="640" height="640" aria-label="Punishment wheel"></canvas>
+      </div>
+      <div id="punishBox">Who lost? Spin the wheel!</div>
+      <button class="btn big orange" id="punishBtn">🎡 Spin the wheel!</button>
     </div>
     <div class="panel center">
       <h2>📝 Title Helper</h2>
@@ -583,6 +604,12 @@ const PUNISHMENTS = [
   "Do an impression of one of the winners",
   "Wear an \"I lost\" sign for one funny photo",
   "Viewers vote the next punishment in the comments"
+];
+
+// Short versions that fit on the wheel's slices (same order as PUNISHMENTS above)
+const PUNISHMENT_LABELS = [
+  "Goofy hat", "Sad slow-mo walk", "Silly accent", "Cheek doodle", "Alphabet jacks", "Sock hands",
+  "Cringe dance", "Winners pick outfit", "\"I love losing!\"", "Do an impression", "\"I lost\" sign", "Viewers vote"
 ];
 
 const INTROS = [
@@ -947,17 +974,7 @@ $("epForm").addEventListener("submit", () => {
 });
 
 /* ---------- 4d. FUN EXTRAS ---------- */
-// "Spinning" = flash random choices quickly, then slow down and land on one.
-function shuffleReveal(box, list, done) {
-  let delay = 50, count = 0;
-  (function tick() {
-    box.textContent = pick(list);
-    count++;
-    if (count < 22) { delay += 12; setTimeout(tick, delay); }
-    else if (done) done(box.textContent);
-  })();
-}
-$("punishBtn").addEventListener("click", () => shuffleReveal($("punishBox"), PUNISHMENTS));
+// (the punishment wheel code is in section 4r)
 $("introBtn").addEventListener("click", () => { $("introOut").textContent = pick(INTROS).replace("Triple E Studios", channelName()); });
 $("titleBtn").addEventListener("click", () => {
   $("titleOut").textContent = `${pick(TITLE_WHO)} ${pick(TITLE_WHAT)} ${pick(TITLE_HOOK)}`;
@@ -1069,15 +1086,21 @@ async function pushChanges() {
     KINDS.forEach(kind => getList(kind).forEach(item => {
       const key = kind + ":" + item.id;
       seen.add(key);
-      const json = JSON.stringify(item);
-      if (synced[key] !== json) changes.push({ kind, id: item.id, data: item, json, key });
+      if (synced[key] === JSON.stringify(item)) return; // unchanged
+      // Remember WHO made this change, so siblings' "What's new" can say "Big Sis moved..."
+      item.editedBy = myName() || "Someone";
+      changes.push({ kind, id: item.id, data: item, json: JSON.stringify(item), key });
     }));
     Object.keys(synced).forEach(key => {
       if (!seen.has(key)) {
         const [kind, ...rest] = key.split(":");
-        changes.push({ kind, id: rest.join(":"), deleted: true, key });
+        // For deleted things we still send the title + who deleted it
+        const old = JSON.parse(synced[key]);
+        changes.push({ kind, id: rest.join(":"), deleted: true, key, data: { title: old.title, editedBy: myName() || "Someone" } });
       }
     });
+    // Save the "editedBy" names on this device too (otherwise it looks like a new change next time)
+    if (changes.length) { save(IDEAS_KEY, ideas); save(EPISODES_KEY, episodes); save("tes_shorts_v1", shorts); }
     // Send in batches of 200 so no single message is too big
     for (let i = 0; i < changes.length; i += 200) {
       const batch = changes.slice(i, i + 200);
@@ -1106,11 +1129,15 @@ async function pullChanges() {
       const list = getList(row.kind);
       const i = list.findIndex(x => x.id === row.id);
       if (row.deleted) {
-        if (key in synced || i >= 0) { delete synced[key]; if (i >= 0) list.splice(i, 1); changed = true; }
+        if (key in synced || i >= 0) {
+          describeChange(row.kind, i >= 0 ? list[i] : null, null, row.data);
+          delete synced[key]; if (i >= 0) list.splice(i, 1); changed = true;
+        }
         return;
       }
       const json = JSON.stringify(row.data);
       if (synced[key] === json) return; // we already have this exact version
+      describeChange(row.kind, i >= 0 ? list[i] : null, row.data);
       synced[key] = json;
       if (i >= 0) list[i] = row.data; else list.push(row.data);
       changed = true;
@@ -1183,6 +1210,7 @@ $("familyJoinBtn").addEventListener("click", async () => {
   try {
     const isNew = await joinFamily(code);
     $("familyCode").value = "";
+    newsMsgId = null; newsCmtId = null; saveNewsIds();
     resetChat(); pullMessages();
     resetComments(); pullComments(); pullVotes();
     showToast(isNew ? "🎉 New family planner made! Give your siblings the same code."
@@ -1246,6 +1274,7 @@ async function pullMessages() {
   try {
     const firstLoad = lastMsgId === 0;
     const rows = await callDb("get_messages", { code: familyCode, after_id: lastMsgId });
+    if (newsMsgId === null && !rows.length) { newsMsgId = 0; saveNewsIds(); } // empty chat: count from the start
     if (!rows.length) return;
     const list = $("chatList");
     // Only auto-scroll if you were already at the bottom (so we don't yank you while reading old messages)
@@ -1253,6 +1282,7 @@ async function pullMessages() {
     // Skip anything we've already shown (two checks can overlap, e.g. right after you hit Send)
     const fresh = rows.filter(m => m.id > lastMsgId);
     fresh.forEach(m => { addMessageToList(m); lastMsgId = m.id; });
+    newsFromMessages(fresh);
     if (atBottom || firstLoad) list.scrollTop = list.scrollHeight;
     if (!firstLoad && !chatIsOpen()) unread += fresh.filter(m => m.name !== chatName).length;
     renderChatState();
@@ -1334,12 +1364,14 @@ async function pullComments() {
   if (!familyCode) return;
   try {
     const rows = await callDb("get_comments", { code: familyCode, after_id: lastCommentId });
+    if (newsCmtId === null && !rows.length) { newsCmtId = 0; saveNewsIds(); } // no comments yet: count from the start
     const fresh = rows.filter(c => c.id > lastCommentId); // skip any we already have
     if (!fresh.length) return;
     fresh.forEach(c => {
       (commentsByCard[c.item_id] = commentsByCard[c.item_id] || []).push(c);
       lastCommentId = c.id;
     });
+    newsFromComments(fresh);
     renderBoard(); // update the 💬 counts
     if ($("epDialog").open) { renderComments(); markCommentsSeen(editingId); }
   } catch (e) { /* offline: try again next tick */ }
@@ -1700,6 +1732,149 @@ async function castVote(idea, value) {
   catch (e) { showToast("😕 Vote didn't save. Check your internet!"); }
   pullVotes();
 }
+
+/* ---------- 4q. WHAT'S NEW ----------
+   When a sibling changes something, we write a little sentence about it
+   ("Little Bro moved 'Boat Race' to Filming") and keep it until you press "Got it".
+   It's saved on this device, so it's still there after you close the app. */
+let news = load("tes_news", []);           // [{ text, at }] newest first
+let newsMsgId = load("tes_news_msg", null); // newest chat message we already turned into news
+let newsCmtId = load("tes_news_cmt", null); // newest comment we already turned into news
+function saveNewsIds() { save("tes_news_msg", newsMsgId); save("tes_news_cmt", newsCmtId); }
+
+function addNews(text) {
+  if (news[0] && news[0].text === text) return; // don't repeat the exact same line
+  news.unshift({ text, at: new Date().toISOString() });
+  news = news.slice(0, 50); // keep the newest 50
+  save("tes_news", news);
+  renderNews();
+}
+
+function renderNews() {
+  $("newsPanel").hidden = news.length === 0;
+  $("newsCount").textContent = news.length ? "(" + news.length + ")" : "";
+  $("newsList").replaceChildren(...news.map(n => el("li", {}, n.text,
+    el("span", { class: "when" }, new Date(n.at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })))));
+}
+$("newsClear").addEventListener("click", () => { news = []; save("tes_news", news); renderNews(); });
+
+const quote = text => "“" + text + "”"; // puts “curly quotes” around a title
+
+// Called by pullChanges for every idea/short/card that a sibling changed.
+// prev = what this device had before (or null if it's new), next = the new version (or null if deleted)
+function describeChange(kind, prev, next, deletedInfo) {
+  const info = next || deletedInfo || {};
+  const who = info.editedBy || "Someone";
+  if (who === myName()) return; // that was you (maybe on another device)
+  const title = quote(info.title || (prev && prev.title) || "something");
+  if (kind === "episodes") {
+    if (!next) return addNews("🗑️ " + who + " deleted the card " + title);
+    if (!prev) return addNews("➕ " + who + " added " + title + " to the Planner");
+    // Several things can change at once, so collect them all into one sentence
+    const parts = [];
+    if (prev.status !== next.status) parts.push("moved it to " + next.status);
+    const ticked = (next.checklist || []).filter(c => c.done && !(prev.checklist || []).some(p => p.id === c.id && p.done));
+    if (ticked.length) parts.push("ticked " + ticked.map(c => quote(c.text)).join(", "));
+    if (next.filmDate && next.filmDate !== (prev.filmDate || "")) parts.push("set filming for " + dayLabel(next.filmDate));
+    if (next.postDate && next.postDate !== (prev.postDate || "")) parts.push("set posting for " + dayLabel(next.postDate));
+    const newJobs = (next.jobs || []).filter(j => !(prev.jobs || []).some(p => p.who === j.who && p.what === j.what));
+    if (newJobs.length) parts.push("added " + newJobs.map(j => j.who + " (" + j.what + ")").join(", "));
+    const icon = prev.status !== next.status ? "📋 " : ticked.length ? "✅ " : "✏️ ";
+    return addNews(icon + who + " updated " + title + (parts.length ? ": " + parts.join(", ") : ""));
+  }
+  const what = kind === "shorts" ? "Short" : "idea";
+  if (!next) return addNews("🗑️ " + who + " deleted the " + what + " " + title);
+  if (!prev) return addNews("💡 " + who + " added a new " + what + ": " + title);
+  if (next.used && !prev.used) return addNews("✅ " + who + " marked " + title + " as done");
+  return addNews("✏️ " + who + " updated the " + what + " " + title);
+}
+
+const shorten = (text, n = 60) => text.length > n ? text.slice(0, n - 1) + "…" : text;
+
+function newsFromMessages(fresh) {
+  if (!fresh.length) return;
+  const newest = fresh[fresh.length - 1].id;
+  // First time ever (or new family): just remember where we are, don't flood you with old chat
+  if (newsMsgId === null) { newsMsgId = newest; saveNewsIds(); return; }
+  fresh.filter(m => m.id > newsMsgId && m.name !== myName()).forEach(m => {
+    if (!chatIsOpen()) addNews("💬 " + m.name + " in Chat: " + quote(shorten(m.body)));
+  });
+  newsMsgId = Math.max(newsMsgId, newest); saveNewsIds();
+}
+
+function newsFromComments(fresh) {
+  if (!fresh.length) return;
+  const newest = fresh[fresh.length - 1].id;
+  if (newsCmtId === null) { newsCmtId = newest; saveNewsIds(); return; }
+  fresh.filter(c => c.id > newsCmtId && c.name !== myName()).forEach(c => {
+    if ($("epDialog").open && editingId === c.item_id) return; // you're already looking at it
+    const card = episodes.find(e => e.id === c.item_id);
+    addNews("💬 " + c.name + " commented on " + quote(card ? card.title : "a card") + ": " + quote(shorten(c.body)));
+  });
+  newsCmtId = Math.max(newsCmtId, newest); saveNewsIds();
+}
+
+/* ---------- 4r. PUNISHMENT WHEEL ----------
+   We draw the wheel ONCE on a <canvas> (a box you can draw on with code),
+   then spin the whole canvas with a CSS rotation. The ▼ pointer stays still at the top.
+   Angles: 0° is the top, going clockwise. Each slice gets 360° ÷ 12 = 30°. */
+const WHEEL_COLORS = ["#ec4899", "#7c3aed", "#f97316", "#16a34a", "#2563eb", "#dc2626"];
+const SLICE = 360 / PUNISHMENTS.length;
+let wheelTurn = 0;      // how far the wheel has turned in total (degrees)
+let wheelSpinning = false;
+
+function drawWheel() {
+  const canvas = $("wheel"), ctx = canvas.getContext("2d");
+  const size = canvas.width, mid = size / 2, radius = mid - 4;
+  ctx.clearRect(0, 0, size, size);
+  PUNISHMENT_LABELS.forEach((label, i) => {
+    // Canvas measures angles from the right side (3 o'clock), so subtract 90° to start at the top
+    const start = (i * SLICE - 90) * Math.PI / 180, end = ((i + 1) * SLICE - 90) * Math.PI / 180;
+    ctx.beginPath(); ctx.moveTo(mid, mid); ctx.arc(mid, mid, radius, start, end); ctx.closePath();
+    ctx.fillStyle = WHEEL_COLORS[i % WHEEL_COLORS.length]; ctx.fill();
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 4; ctx.stroke();
+    // The words: turn to the middle of the slice and write outward from the center
+    ctx.save();
+    ctx.translate(mid, mid);
+    ctx.rotate((start + end) / 2);
+    ctx.fillStyle = "#ffffff"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    // Start big, and shrink the letters until the label fits between the middle circle and the edge
+    const room = radius - 22 - 50;
+    let fontSize = 32;
+    do { ctx.font = "bold " + fontSize + "px 'Comic Sans MS', 'Chalkboard SE', sans-serif"; fontSize -= 2; }
+    while (ctx.measureText(label).width > room && fontSize > 16);
+    ctx.fillText(label, radius - 22, 0, room);
+    ctx.restore();
+  });
+  // a little circle in the middle
+  ctx.beginPath(); ctx.arc(mid, mid, 34, 0, Math.PI * 2); ctx.fillStyle = "#ffffff"; ctx.fill();
+  ctx.lineWidth = 6; ctx.strokeStyle = "#2b2160"; ctx.stroke();
+}
+
+$("punishBtn").addEventListener("click", () => {
+  if (wheelSpinning) return;
+  wheelSpinning = true;
+  $("punishBox").textContent = "Spinning... 🥁";
+  // Pick the winner first, then work out how far to turn so it stops under the pointer
+  const winner = Math.floor(Math.random() * PUNISHMENTS.length);
+  const sliceMiddle = winner * SLICE + SLICE / 2;
+  const wobble = (Math.random() - 0.5) * SLICE * 0.6; // land somewhere inside the slice, not dead center
+  const extraSpins = 5 + Math.floor(Math.random() * 3); // 5–7 full turns for drama
+  // Turning the wheel clockwise by X brings the slice at angle (360 - X) to the top
+  const landAt = (360 - sliceMiddle - wobble + 360) % 360;
+  wheelTurn += extraSpins * 360 + ((landAt - wheelTurn % 360) + 360) % 360;
+  const wheel = $("wheel");
+  const slow = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  wheel.style.transition = slow ? "transform 4.5s cubic-bezier(0.15, 0.85, 0.25, 1)" : "transform 0.6s ease-out";
+  wheel.style.transform = "rotate(" + wheelTurn + "deg)";
+  setTimeout(() => {
+    $("punishBox").textContent = "😈 " + PUNISHMENTS[winner] + "!";
+    wheelSpinning = false;
+  }, slow ? 4600 : 700);
+});
+
+drawWheel();
+renderNews();
 
 /* ---------- Draw everything ---------- */
 function renderAll() {
