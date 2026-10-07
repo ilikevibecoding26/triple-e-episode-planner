@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triple E Studios — Episode Planner</title>
+<style>
+  /* ============ COLORS ============
+     Each channel has its own color. Change these to re-theme the whole app! */
+  :root {
+    --gaming: #22c55e;       /* Minecraft green */
+    --gaming-soft: #dcfce7;
+    --challenge: #f97316;    /* Challenge orange */
+    --challenge-soft: #ffedd5;
+    --ink: #2b2160;          /* dark purple for text */
+    --bg: #fff7d6;           /* sunny yellow background */
+    --card: #ffffff;
+    --pink: #ec4899;
+    --purple: #7c3aed;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--ink); background: var(--bg);
+    font-family: "Baloo 2", "Comic Sans MS", "Chalkboard SE", "Marker Felt", system-ui, sans-serif;
+    font-size: 17px;
+  }
+  header {
+    text-align: center; padding: 18px 12px 10px;
+    background: linear-gradient(90deg, var(--purple), var(--pink), var(--challenge));
+    color: white; border-bottom: 6px solid var(--ink);
+  }
+  header h1 { margin: 0; font-size: 2.1rem; text-shadow: 3px 3px 0 rgba(0,0,0,.25); }
+  #stats { margin-top: 4px; font-weight: bold; opacity: .95; }
+
+  nav { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding: 12px; }
+  nav button.tab {
+    font: inherit; font-weight: bold; padding: 10px 18px; border-radius: 999px;
+    border: 3px solid var(--ink); background: white; color: var(--ink); cursor: pointer;
+  }
+  nav button.tab.active { background: var(--purple); color: white; }
+
+  main { max-width: 1200px; margin: 0 auto; padding: 0 14px 40px; }
+  section.page { display: none; }
+  section.page.active { display: block; }
+
+  button, select, input, textarea { font: inherit; color: var(--ink); }
+  .btn {
+    border: 3px solid var(--ink); border-radius: 16px; padding: 10px 18px; cursor: pointer;
+    font-weight: bold; background: var(--pink); color: white; box-shadow: 0 4px 0 var(--ink);
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .btn.big { font-size: 1.6rem; padding: 16px 30px; }
+  .btn.green { background: var(--gaming); }
+  .btn.orange { background: var(--challenge); }
+  .btn.purple { background: var(--purple); }
+  .btn.small { font-size: .85rem; padding: 4px 10px; box-shadow: 0 2px 0 var(--ink); border-radius: 10px; }
+  .btn.ghost { background: white; color: var(--ink); }
+
+  input, select, textarea {
+    border: 3px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: white; width: 100%;
+  }
+  label { display: block; font-weight: bold; margin: 10px 0 4px; }
+
+  .panel { background: var(--card); border: 4px solid var(--ink); border-radius: 22px; padding: 18px; margin-bottom: 18px; }
+  .center { text-align: center; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: center; }
+
+  /* channel color chips + card accents */
+  .chip { display: inline-block; padding: 2px 12px; border-radius: 999px; font-size: .8rem; font-weight: bold; color: white; border: 2px solid var(--ink); }
+  .chip.Gaming { background: var(--gaming); }
+  .chip.Challenge { background: var(--challenge); }
+  .chip.Short { background: var(--purple); }
+  .accent-Gaming { border-left: 10px solid var(--gaming); }
+  .accent-Challenge { border-left: 10px solid var(--challenge); }
+
+  /* ---- Spin page ---- */
+  #ideaCard, #shortCard { margin: 18px auto; max-width: 640px; min-height: 160px; border-radius: 24px; padding: 20px; border: 4px solid var(--ink); background: white; }
+  #ideaCard.Gaming { background: var(--gaming-soft); }
+  #ideaCard.Challenge { background: var(--challenge-soft); }
+  #ideaCard h2 { margin: 8px 0; font-size: 1.8rem; }
+  @keyframes pop { 0% { transform: scale(.7) rotate(-4deg); } 70% { transform: scale(1.06) rotate(1deg); } 100% { transform: scale(1); } }
+  #ideaCard.pop { animation: pop .4s ease; }
+  .picker label { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 8px 14px; border: 3px solid var(--ink); border-radius: 999px; background: white; cursor: pointer; }
+  .picker input { width: auto; }
+  .picker label.on { background: var(--purple); color: white; }
+
+  /* ---- Bank page ---- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .idea { background: white; border: 3px solid var(--ink); border-radius: 16px; padding: 12px; }
+  .idea.used { opacity: .55; }
+  .idea h3 { margin: 6px 0 4px; font-size: 1.05rem; }
+  .idea p { margin: 0 0 8px; font-size: .9rem; }
+
+  /* ---- Planner board ---- */
+  #board { display: grid; grid-template-columns: repeat(5, minmax(210px, 1fr)); gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+  .col { border: 4px solid var(--ink); border-radius: 18px; padding: 8px; min-height: 220px; background: #fff; }
+  .col h3 { margin: 0 0 8px; text-align: center; color: white; border-radius: 10px; padding: 4px; border: 2px solid var(--ink); }
+  .col.dragover { outline: 5px dashed var(--pink); }
+  .col[data-stage="Idea"] h3 { background: #8b5cf6; }
+  .col[data-stage="Planned"] h3 { background: #3b82f6; }
+  .col[data-stage="Filming"] h3 { background: #ef4444; }
+  .col[data-stage="Editing"] h3 { background: #eab308; }
+  .col[data-stage="Posted"] h3 { background: #22c55e; }
+  .ep { background: #fffdf2; border: 3px solid var(--ink); border-radius: 12px; padding: 8px; margin-bottom: 8px; cursor: grab; }
+  .ep h4 { margin: 4px 0; font-size: 1rem; cursor: pointer; }
+  .ep p { margin: 0 0 6px; font-size: .82rem; }
+  .ep .moves { display: flex; justify-content: space-between; }
+
+  /* ---- Pop-up form ---- */
+  dialog { border: 4px solid var(--ink); border-radius: 22px; max-width: 520px; width: 92%; background: white; padding: 18px; }
+  dialog::backdrop { background: rgba(43,33,96,.55); }
+
+  /* ---- Extras ---- */
+  #punishBox { font-size: 1.5rem; font-weight: bold; min-height: 90px; display: flex; align-items: center; justify-content: center; border: 4px dashed var(--pink); border-radius: 20px; padding: 14px; margin: 14px 0; background: #fdf2f8; }
+  #titleOut { font-size: 1.6rem; font-weight: bold; margin: 12px 0; }
+  .empty { text-align: center; opacity: .6; padding: 10px; }
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 120px); z-index: 10;
+    background: var(--gaming); color: white; font-weight: bold; padding: 14px 22px;
+    border: 4px solid var(--ink); border-radius: 18px; box-shadow: 0 5px 0 var(--ink);
+    transition: transform .3s; max-width: 90%; text-align: center; pointer-events: none;
+  }
+  #toast.show { transform: translate(-50%, 0); }
+  @media (max-width: 700px) { header h1 { font-size: 1.5rem; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎬 Triple E Studios Episode Planner 🎬</h1>
+  <div id="stats"></div>
+</header>
+
+<nav>
+  <button class="tab active" data-page="spin">🎲 Spin</button>
+  <button class="tab" data-page="bank">💡 Idea Bank</button>
+  <button class="tab" data-page="shorts">⚡ Shorts</button>
+  <button class="tab" data-page="planner">📋 Planner</button>
+  <button class="tab" data-page="extras">🎉 Fun Extras</button>
+</nav>
+
+<main>
+
+  <!-- ===================== SPIN ===================== -->
+  <section class="page active" id="page-spin">
+    <div class="panel center">
+      <h2>Which channel today?</h2>
+      <div class="row picker" id="channelPicker">
+        <label><input type="radio" name="chan" value="Any" checked> 🎰 Surprise me!</label>
+        <label><input type="radio" name="chan" value="Gaming"> ⛏️ Gaming</label>
+        <label><input type="radio" name="chan" value="Challenge"> 🏆 Challenge</label>
+      </div>
+      <p><button class="btn big" id="spinBtn">🎲 Give me an idea!</button></p>
+      <div id="ideaCard"><div class="empty">Press the big button to get your next episode idea! ✨</div></div>
+      <div class="row" id="ideaActions" hidden>
+        <button class="btn orange" id="againBtn">🔄 Give me another!</button>
+        <button class="btn green" id="sendBtn">📋 Send to Planner</button>
+        <button class="btn purple" id="usedBtn">✅ Already did this one</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== IDEA BANK ===================== -->
+  <section class="page" id="page-bank">
+    <div class="panel">
+      <h2>➕ Add your own idea</h2>
+      <form id="ideaForm">
+        <label for="ideaTitle">Title</label>
+        <input id="ideaTitle" required maxlength="80" placeholder="e.g. Pillow Fort Sumo">
+        <label for="ideaChannel">Channel</label>
+        <select id="ideaChannel"><option>Gaming</option><option>Challenge</option></select>
+        <label for="ideaDesc">Short description</label>
+        <textarea id="ideaDesc" rows="2" placeholder="What happens in the video?"></textarea>
+        <p><button class="btn green" type="submit">💾 Save to bank</button></p>
+      </form>
+    </div>
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">💡 All ideas (<span id="bankCount"></span>)</h2>
+        <select id="bankFilter" style="width:auto">
+          <option value="Any">Show everything</option><option value="Gaming">Gaming only</option><option value="Challenge">Challenge only</option>
+        </select>
+      </div>
+      <div class="grid" id="bankGrid" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <!-- ===================== SHORTS ===================== -->
+  <section class="page" id="page-shorts">
+    <div class="panel center">
+      <h2>⚡ Short Ideas (under 60 seconds!)</h2>
+      <p><button class="btn big" id="shortSpinBtn">🎲 Give me a Short!</button></p>
+      <div id="shortCard"><div class="empty">Press the button for a quick Short idea ✨</div></div>
+      <div class="row" id="shortActions" hidden>
+        <button class="btn orange" id="shortAgainBtn">🔄 Another!</button>
+        <button class="btn green" id="shortSendBtn">📋 Send to Planner</button>
+        <button class="btn purple" id="shortUsedBtn">✅ Already did this one</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>➕ Add your own Short idea</h2>
+      <form id="shortForm">
+        <label for="shortTitle">Title</label>
+        <input id="shortTitle" required maxlength="80" placeholder="e.g. 10-Second Dance Battle">
+        <label for="shortChannel">Channel</label>
+        <select id="shortChannel"><option>Gaming</option><option>Challenge</option></select>
+        <label for="shortDesc">Short description</label>
+        <textarea id="shortDesc" rows="2"></textarea>
+        <p><button class="btn green" type="submit">💾 Save Short idea</button></p>
+      </form>
+    </div>
+    <div class="panel">
+      <h2>⚡ All Short ideas (<span id="shortCount"></span>)</h2>
+      <div class="grid" id="shortGrid"></div>
+    </div>
+  </section>
+
+  <!-- ===================== PLANNER ===================== -->
+  <section class="page" id="page-planner">
+    <p class="center"><button class="btn purple" id="newEpBtn">➕ New episode</button>
+    <br><small>Tip: drag cards between columns, or use the ◀ ▶ buttons. Click a title to edit notes!</small></p>
+    <div id="board"></div>
+  </section>
+
+  <!-- ===================== EXTRAS ===================== -->
+  <section class="page" id="page-extras">
+    <div class="panel center">
+      <h2>😈 Punishment Picker</h2>
+      <div id="punishBox">Who lost? Press the button!</div>
+      <button class="btn big orange" id="punishBtn">🎡 Spin the punishment!</button>
+    </div>
+    <div class="panel center">
+      <h2>📝 Title Helper</h2>
+      <p>Formula: <b>[Who] + [What challenge] + [Curiosity hook]</b></p>
+      <div id="titleOut">Press the button!</div>
+      <button class="btn big purple" id="titleBtn">✨ Make a title</button>
+    </div>
+    <div class="panel center">
+      <h2>📦 Share &amp; Backup</h2>
+      <p>Save everything to a file to send to your siblings (or keep as a backup). They can load it into their copy.</p>
+      <div class="row">
+        <button class="btn green" id="exportBtn">⬇️ Export my planner</button>
+        <button class="btn purple" id="importBtn">⬆️ Import a planner file</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </div>
+      <p><small>Importing <b>adds</b> the new ideas and cards to yours. Nothing you have gets erased; if the same card is in both, the imported one wins.</small></p>
+    </div>
+    <div class="panel center">
+      <h2>🎤 Intro line picker</h2>
+      <div id="introOut" style="font-size:1.3rem;font-weight:bold;margin:10px 0">Need a way to start the video?</div>
+      <button class="btn green" id="introBtn">🎬 Give me an intro</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast" role="status"></div>
+
+<!-- Pop-up used for creating AND editing an episode -->
+<dialog id="epDialog">
+  <form method="dialog" id="epForm">
+    <h2 id="epDialogTitle">Episode</h2>
+    <label>Title</label><input id="epTitle" required maxlength="80">
+    <label>Channel</label><select id="epChannel"><option>Gaming</option><option>Challenge</option></select>
+    <label>Status</label><select id="epStatus"></select>
+    <label>Concept</label><textarea id="epDesc" rows="2"></textarea>
+    <label>Title options</label><textarea id="epTitleOpts" rows="2" placeholder="A few possible video titles"></textarea>
+    <label>Thumbnail idea</label><textarea id="epThumb" rows="2"></textarea>
+    <label>Spoken hook (first line of the video)</label><textarea id="epHook" rows="2"></textarea>
+    <label>Punishment (for challenges)</label><input id="epPunish">
+    <p class="row">
+      <button class="btn green" type="submit">💾 Save</button>
+      <button class="btn ghost" type="button" id="epCancel">Cancel</button>
+      <button class="btn orange" type="button" id="epDelete">🗑️ Delete</button>
+    </p>
+  </form>
+</dialog>
+
+<script>
+/* =====================================================================
+   TRIPLE E STUDIOS EPISODE PLANNER
+   Everything lives in this one file. Sections:
+     1. Starting data (seed ideas, punishments...)
+     2. Saving & loading (localStorage)
+     3. Small helper functions
+     4. Each page: Spin, Bank, Planner, Extras
+   ===================================================================== */
+
+/* ---------- 1. STARTING DATA ---------- */
+
+// Each seed idea is [title, description]. We add the channel below.
+const CHALLENGE_SEEDS = [
+  ["Last to Leave the Circle Wins", "Everyone stands in a taped circle; last one still inside (no leaving for any reason) wins."],
+  ["Younger Sibling Is in Charge", "The youngest gets to boss the others around for the whole video (safe, reasonable tasks only)."],
+  ["Try Not to Laugh", "Take turns trying to make each other crack up while staying serious."],
+  ["The Floor Is Lava", "Get across a room without touching the ground, timed."],
+  ["Extreme Hide and Seek (Lights Off)", "Hide-and-seek around the house with flashlights instead of the lights on."],
+  ["Whisper Challenge", "Headphones on with loud music, guess what your sibling is mouthing."],
+  ["Copy My Dance", "Each sibling adds a dance move and the next has to repeat the whole growing sequence."],
+  ["Blindfolded Obstacle Course", "One sibling is blindfolded and guided through a pillow obstacle course by the other two shouting directions."],
+  ["Guess Who Drawing Challenge", "Everyone draws each other and the group rates the drawings."],
+  ["Sibling Swap for a Day", "Trade chores, rooms, or \"jobs\" for the day and film how it goes."],
+  ["Mystery Box Touch Challenge", "Reach into a box and guess what you're touching by feel (safe household items only)."],
+  ["Would You Rather Wheel", "Spin a wheel of silly questions/dares instead of just talking through them."],
+  ["Banned Word Challenge", "Pick a common word nobody's allowed to say all day; whoever slips gets a punishment."],
+  ["Talent Show", "Each sibling shows off a talent (real or joke); a parent judges."],
+  ["Scavenger Hunt", "Hide clues around the house/yard leading to a prize; race to finish first."],
+  ["Water Balloon Target Challenge", "Outside — hit a target or dodge the best."],
+  ["Paper Airplane Contest", "Build and fly paper airplanes; whoever's flies farthest wins."],
+  ["Balloon Dare Pop", "Silly dares stuffed in balloons; pop one each round and do what it says."],
+  ["Blanket Fort Battle", "Each sibling builds their own fort; a judge picks the best one."],
+  ["Backyard Obstacle Course Race", "Build one from pillows, chairs, and hula hoops; time each other."],
+  ["Try to Make Me Laugh (With Props)", "Use props and funny faces/sounds (no touching) to crack each other up."]
+];
+
+const GAMING_SEEDS = [
+  ["Build Battle", "Same theme, time limit, judge (or comments) picks the winner."],
+  ["Copy the Build", "One person builds something, others try to copy it without looking at the original."],
+  ["$10,000 vs $100 House Challenge", "One sibling builds fancy, another builds basic; tour both."],
+  ["Build in 10 / 1 / 100 Seconds", "Build the same thing under wildly different time limits."],
+  ["Can 3 Siblings Survive 100 Days?", "Classic long-form survival series, split into episodes."],
+  ["One Block, Three Players", "Everyone starts on a single floating block and has to expand together."],
+  ["Hardcore Mode Challenge", "One death and it's over — high tension."],
+  ["The Banned Word Minecraft Run", "Normal survival, but a silly rule (like a banned word) is in play."],
+  ["Minecraft Hide and Seek (Classic)", "Hide around a big build; seeker counts and searches."],
+  ["Minecraft Hide and Seek (Block Disguise)", "Hiders disguise as blocks using a hide-and-seek map; seeker has to find the fakes."],
+  ["Speedrun Race", "Who can beat the Ender Dragon (or find diamonds) fastest?"],
+  ["Floor Is Lava Parkour", "Cross a parkour course without touching certain blocks."],
+  ["Mob Battle Arena", "Spawn mobs and bet on which one wins."],
+  ["Troll Your Sibling (Nicely)", "Set up friendly, harmless pranks/traps and film the reaction."],
+  ["5-Room Escape Room", "The Rainbow Room, Jungle Room, Sky Parkour Room, Riddle Library, and Treasure Vault (full blueprint already designed)."],
+  ["Whatever We Mine, We Have to Use", "No throwing anything away, even the junk."],
+  ["Swap Builds Halfway", "Start each other's builds, finish what your sibling began."],
+  ["Speed Build Relay", "Each sibling builds for 30 seconds, then the next takes over."],
+  ["Guess What I Built", "Build something; others guess what it is."],
+  ["Sabotage Build Battle", "Each person secretly messes with one other build, once."],
+  ["Tiny Town / Theme Park / Zoo Build Series", "Each sibling designs one part of a shared build."],
+  ["Roleplay a Day", "Act out little characters and a story together."],
+  ["Recreate Our Bedroom/Home", "Rebuild your real-life room in Minecraft."],
+  ["\"I Gave My Sibling a World and They Ruined It\"", "Reaction-style video."],
+  ["Mob Tier List", "Rank mobs best to worst, arguing the whole time."],
+  ["Only One Block Type Challenge", "Build using just one type of block (e.g. all-dirt, all-glass)."],
+  ["Spleef Battle", "Dig out the floor under each other until someone falls."],
+  ["PvP Arena Battle", "Same gear, simple arena, best of 3 rounds."],
+  ["Redstone Contraption Contest", "Each sibling builds one cool simple redstone gadget."],
+  ["Underwater Base Build", "Fully underwater base using glass."],
+  ["Sky Island Build", "Floating island base — whose looks best?"],
+  ["Build a Maze and Get Lost in It", "One sibling designs a maze, others race to find the exit."],
+  ["Villager Trading Race", "Timed trading contest — who ends up with the best stuff?"],
+  ["Fishing Contest", "Timed — rarest or most catches wins."],
+  ["Automatic Farm Race", "Who builds a working farm fastest?"],
+  ["Turn Our World Into a Theme Park", "Each sibling designs one ride/attraction, then \"visit\" together."],
+  ["Boat Race", "Build boats, race across water."],
+  ["Invent Your Own Minigame", "Each sibling invents a new simple game; others test it."]
+];
+
+// Short ideas (YouTube Shorts): [title, description, channel]
+const SHORT_SEEDS = [
+  ["10-Second Dance Battle", "Each sibling gets 10 seconds to bust out their best dance. Viewers pick the winner!", "Challenge"],
+  ["Try Not to Laugh in 30 Seconds", "Stone-faced staring contest while a sibling makes silly faces.", "Challenge"],
+  ["Mystery Box in 15 Seconds", "Reach in, guess the item fast. Safe household stuff only!", "Challenge"],
+  ["Paper Airplane Distance Showdown", "One throw each. Farthest flight wins.", "Challenge"],
+  ["Whisper Challenge Fail Compilation", "The funniest wrong guesses, super quick.", "Challenge"],
+  ["Balloon Pop Dare — Just One!", "Pop one balloon and do what it says.", "Challenge"],
+  ["Floor Is Lava Speed Dash", "Cross the room without touching the floor. Beat the clock!", "Challenge"],
+  ["Build a House in 30 Seconds", "Minecraft speed build with the timer on screen.", "Gaming"],
+  ["Can You Guess the Build?", "Show 5 seconds of a build; viewers guess in the comments.", "Gaming"],
+  ["Minecraft Mob Face-Off", "Two mobs, one winner, super fast.", "Gaming"],
+  ["Parkour in 20 Seconds", "Clear a tiny parkour course before time runs out.", "Gaming"],
+  ["Trap Your Sibling (Nicely!)", "Quick harmless Minecraft trap and the reaction.", "Gaming"],
+  ["One-Block Build Challenge", "Build something awesome with just one type of block.", "Gaming"],
+  ["Rate My Build 1–10", "Siblings rate each other's build with total honesty.", "Gaming"],
+  ["Hide and Seek: Found in 10 Seconds?", "Seeker only gets 10 seconds to find the hiders.", "Gaming"]
+];
+
+const PUNISHMENTS = [
+  "Wear a goofy hat or costume for the rest of the video",
+  "Do a dramatic slow-motion sad walk",
+  "Talk in a silly accent until the video ends",
+  "Winners draw a silly doodle on your cheek (washable marker)",
+  "Do 10 jumping jacks while singing the alphabet",
+  "Wear socks on your hands for the rest of the video",
+  "Do a made-up cringe dance for 15 seconds",
+  "Winners pick your outfit for the next video",
+  "Answer everything with \"I love losing!\" for one minute",
+  "Do an impression of one of the winners",
+  "Wear an \"I lost\" sign for one funny photo",
+  "Viewers vote the next punishment in the comments"
+];
+
+const INTROS = [
+  "What's up, it's the Triple E Studios crew — let's go!",
+  "Three siblings, one channel, way too much chaos — welcome back!",
+  "Hey everyone, we're back and today's about to get WILD.",
+  "It's your favorite trio, back at it again on Triple E Studios!",
+  "Alright guys, you know the drill — let's jump right in!"
+];
+
+// Title helper word lists:  [Who] + [What challenge] + [Curiosity hook]
+const TITLE_WHO = ["3 Siblings", "Big Sis vs Little Bro", "The Triple E Crew", "We", "My Siblings and I"];
+const TITLE_WHAT = ["Play Hide and Seek", "Build the Best Fort", "Survive the Floor Is Lava", "Try Not to Laugh", "Race Through an Obstacle Course", "Build a Minecraft House"];
+const TITLE_HOOK = ["in the DARK!", "(WINNER GETS A PRIZE!)", "— You Won't Believe What Happened!", "but the LAST ONE WINS!", "and Someone CRIED Laughing!", "in Only 60 Seconds!"];
+
+const STAGES = ["Idea", "Planned", "Filming", "Editing", "Posted"];
+
+/* ---------- 2. SAVING & LOADING ----------
+   localStorage is a tiny notebook inside the browser. It only stores TEXT,
+   so we turn our lists into text with JSON.stringify when saving, and back
+   into lists with JSON.parse when loading. */
+const IDEAS_KEY = "tes_ideas_v1";
+const EPISODES_KEY = "tes_episodes_v1";
+
+function load(key, fallback) {
+  try {
+    const text = localStorage.getItem(key);
+    return text ? JSON.parse(text) : fallback;
+  } catch (e) {
+    return fallback; // if anything goes wrong, just start fresh
+  }
+}
+function save(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); }
+  catch (e) { alert("Oops! The browser wouldn't let us save. 😢"); }
+}
+
+// Make a unique id for each item (current time + a random bit)
+function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function makeSeedIdeas() {
+  const toIdea = channel => ([title, desc]) => ({ id: newId(), title, channel, desc, used: false, custom: false });
+  return [...CHALLENGE_SEEDS.map(toIdea("Challenge")), ...GAMING_SEEDS.map(toIdea("Gaming"))];
+}
+
+// The two lists the whole app works with. First time ever => use the seed ideas.
+let ideas = load(IDEAS_KEY, null) || makeSeedIdeas();
+let episodes = load(EPISODES_KEY, []);
+// Shorts get their own saved list so they stay separate from full-episode ideas
+let shorts = load("tes_shorts_v1", null) ||
+  SHORT_SEEDS.map(([title, desc, channel]) => ({ id: newId(), title, channel, desc, used: false, custom: false }));
+function saveAll() { save(IDEAS_KEY, ideas); save(EPISODES_KEY, episodes); save("tes_shorts_v1", shorts); renderAll(); }
+
+/* ---------- 3. HELPERS ---------- */
+const $ = id => document.getElementById(id);
+const pick = list => list[Math.floor(Math.random() * list.length)]; // the random picker!
+
+// Build an HTML element safely. el("p", {class:"x"}, "text", otherElement)
+// (Using textContent means typed text can never break the page.)
+function el(tag, attrs = {}, ...kids) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") node.className = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v);
+  }
+  kids.forEach(kid => node.append(kid));
+  return node;
+}
+const chip = channel => el("span", { class: "chip " + channel }, channel === "Gaming" ? "⛏️ Gaming" : "🏆 Challenge");
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll("button.tab").forEach(btn => btn.addEventListener("click", () => {
+  document.querySelectorAll("button.tab").forEach(b => b.classList.toggle("active", b === btn));
+  document.querySelectorAll("section.page").forEach(s => s.classList.toggle("active", s.id === "page-" + btn.dataset.page));
+}));
+
+/* ---------- Stats line ---------- */
+function renderStats() {
+  const count = stage => episodes.filter(e => e.status === stage).length;
+  const inPlanning = count("Idea") + count("Planned");
+  $("stats").textContent =
+    `${ideas.length} ideas banked · ${inPlanning} in planning · ${count("Filming")} filming · ${count("Editing")} editing · ${count("Posted")} posted! 🎉`;
+}
+
+/* ---------- 4a. SPIN PAGE ---------- */
+let currentIdea = null; // the idea currently showing on the card
+
+function chosenChannel() { return document.querySelector("input[name=chan]:checked").value; }
+
+// Highlight whichever channel radio is selected
+document.querySelectorAll("input[name=chan]").forEach(r => r.addEventListener("change", () => {
+  document.querySelectorAll("#channelPicker label").forEach(l => l.classList.toggle("on", l.querySelector("input").checked));
+}));
+document.querySelector("#channelPicker label").classList.add("on");
+
+function spin() {
+  const channel = chosenChannel();
+  // Step 1: keep only ideas from the chosen channel that we haven't already done
+  let pool = ideas.filter(i => !i.used && (channel === "Any" || i.channel === channel));
+  // Step 2: don't show the exact same idea twice in a row (if we have other choices)
+  if (pool.length > 1 && currentIdea) pool = pool.filter(i => i.id !== currentIdea.id);
+  const card = $("ideaCard");
+  if (pool.length === 0) {
+    currentIdea = null;
+    card.className = "";
+    card.replaceChildren(el("div", { class: "empty" }, "🎉 You've done every idea here! Add new ones in the Idea Bank, or un-check some ✅ there."));
+    $("ideaActions").hidden = true;
+    return;
+  }
+  // Step 3: pick one at random
+  currentIdea = pick(pool);
+  card.className = currentIdea.channel + " pop";
+  card.replaceChildren(chip(currentIdea.channel), el("h2", {}, currentIdea.title), el("p", {}, currentIdea.desc || "(No description yet)"));
+  // restart the pop animation
+  void card.offsetWidth; card.classList.add("pop");
+  $("ideaActions").hidden = false;
+}
+$("spinBtn").addEventListener("click", spin);
+$("againBtn").addEventListener("click", spin);
+$("sendBtn").addEventListener("click", () => {
+  if (!currentIdea) return;
+  addEpisode({ title: currentIdea.title, channel: currentIdea.channel, desc: currentIdea.desc });
+  // Make the button itself say "Sent!" for a moment, so it's obvious it worked
+  const btn = $("sendBtn");
+  btn.textContent = "✅ Sent to Planner!";
+  setTimeout(() => { btn.textContent = "📋 Send to Planner"; }, 1800);
+});
+$("usedBtn").addEventListener("click", () => {
+  if (!currentIdea) return;
+  ideas.find(i => i.id === currentIdea.id).used = true;
+  saveAll();
+  spin(); // jump straight to a fresh idea
+});
+
+/* ---------- 4b. IDEA BANK PAGE ---------- */
+$("ideaForm").addEventListener("submit", e => {
+  e.preventDefault();
+  ideas.unshift({ id: newId(), title: $("ideaTitle").value.trim(), channel: $("ideaChannel").value, desc: $("ideaDesc").value.trim(), used: false, custom: true });
+  e.target.reset();
+  saveAll();
+});
+$("bankFilter").addEventListener("change", renderBank);
+
+function renderBank() {
+  const f = $("bankFilter").value;
+  const shown = ideas.filter(i => f === "Any" || i.channel === f);
+  $("bankCount").textContent = shown.length;
+  $("bankGrid").replaceChildren(...shown.map(idea => el("div", { class: "idea accent-" + idea.channel + (idea.used ? " used" : "") },
+    chip(idea.channel), idea.used ? el("span", {}, " ✅ done") : "", idea.custom ? el("span", {}, " ⭐ ours") : "",
+    el("h3", {}, idea.title),
+    el("p", {}, idea.desc),
+    el("div", { class: "row", style: "justify-content:flex-start" },
+      el("button", { class: "btn small green", onclick: () => addEpisode({ title: idea.title, channel: idea.channel, desc: idea.desc }) }, "📋 Plan it"),
+      el("button", { class: "btn small ghost", onclick: () => { idea.used = !idea.used; saveAll(); } }, idea.used ? "↩️ Not done" : "✅ Did it"),
+      el("button", { class: "btn small orange", onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => { ideas = ideas.filter(i => i.id !== idea.id); saveAll(); }) }, "🗑️")
+    )
+  )));
+}
+
+/* ---------- 4b2. SHORTS PAGE ---------- */
+let currentShort = null;
+
+function spinShort() {
+  // Same random-picker idea as the Spin page: skip done ones and the one we just showed
+  let pool = shorts.filter(s => !s.used);
+  if (pool.length > 1 && currentShort) pool = pool.filter(s => s.id !== currentShort.id);
+  const card = $("shortCard");
+  if (!pool.length) {
+    currentShort = null;
+    card.className = "";
+    card.replaceChildren(el("div", { class: "empty" }, "🎉 You've done every Short! Add more below."));
+    $("shortActions").hidden = true;
+    return;
+  }
+  currentShort = pick(pool);
+  card.className = currentShort.channel;
+  card.replaceChildren(chip(currentShort.channel), el("h2", {}, currentShort.title), el("p", {}, currentShort.desc || ""));
+  void card.offsetWidth; card.classList.add("pop");
+  $("shortActions").hidden = false;
+}
+$("shortSpinBtn").addEventListener("click", spinShort);
+$("shortAgainBtn").addEventListener("click", spinShort);
+$("shortSendBtn").addEventListener("click", () => {
+  if (!currentShort) return;
+  addEpisode({ title: currentShort.title, channel: currentShort.channel, desc: currentShort.desc, isShort: true });
+  const btn = $("shortSendBtn");
+  btn.textContent = "✅ Sent to Planner!";
+  setTimeout(() => { btn.textContent = "📋 Send to Planner"; }, 1800);
+});
+$("shortUsedBtn").addEventListener("click", () => {
+  if (!currentShort) return;
+  shorts.find(s => s.id === currentShort.id).used = true;
+  saveAll();
+  spinShort();
+});
+$("shortForm").addEventListener("submit", e => {
+  e.preventDefault();
+  shorts.unshift({ id: newId(), title: $("shortTitle").value.trim(), channel: $("shortChannel").value, desc: $("shortDesc").value.trim(), used: false, custom: true });
+  e.target.reset();
+  saveAll();
+});
+
+function renderShorts() {
+  $("shortCount").textContent = shorts.length;
+  $("shortGrid").replaceChildren(...shorts.map(s => el("div", { class: "idea accent-" + s.channel + (s.used ? " used" : "") },
+    chip(s.channel), s.used ? el("span", {}, " ✅ done") : "", s.custom ? el("span", {}, " ⭐ ours") : "",
+    el("h3", {}, s.title),
+    el("p", {}, s.desc),
+    el("div", { class: "row", style: "justify-content:flex-start" },
+      el("button", { class: "btn small green", onclick: () => addEpisode({ title: s.title, channel: s.channel, desc: s.desc, isShort: true }) }, "📋 Plan it"),
+      el("button", { class: "btn small ghost", onclick: () => { s.used = !s.used; saveAll(); } }, s.used ? "↩️ Not done" : "✅ Did it"),
+      el("button", { class: "btn small orange", onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => { shorts = shorts.filter(x => x.id !== s.id); saveAll(); }) }, "🗑️")
+    )
+  )));
+}
+
+/* ---------- 4c. PLANNER PAGE ---------- */
+function addEpisode({ title, channel, desc, isShort = false }) {
+  // isShort marks the card as a YouTube Short so it gets a ⚡ badge on the board
+  episodes.push({ id: newId(), title, channel, desc: desc || "", isShort, status: "Idea", titleOpts: "", thumb: "", hook: "", punish: "" });
+  saveAll();
+  showToast("✅ \"" + title + "\" was sent to the Planner!");
+}
+
+// Delete safety check WITHOUT a pop-up (browsers sometimes block pop-ups).
+// First tap: the button asks "Sure?". Tap again within 3 seconds: it deletes.
+// If you wait, it goes back to normal.
+function twoTapDelete(btn, normalLabel, doDelete) {
+  if (btn.dataset.armed) { doDelete(); return; }
+  btn.dataset.armed = "yes";
+  btn.textContent = "Sure? 😬";
+  setTimeout(() => { delete btn.dataset.armed; btn.textContent = normalLabel; }, 3000);
+}
+
+// A little message that pops up at the bottom of the screen, then fades away
+let toastTimer;
+function showToast(message) {
+  const toast = $("toast");
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 2500);
+}
+
+// Move an episode one stage left (-1) or right (+1)
+function shift(ep, dir) {
+  const i = STAGES.indexOf(ep.status) + dir;
+  if (i >= 0 && i < STAGES.length) { ep.status = STAGES[i]; saveAll(); }
+}
+
+function renderBoard() {
+  $("board").replaceChildren(...STAGES.map(stage => {
+    const col = el("div", { class: "col", "data-stage": stage }, el("h3", {}, stage));
+    const mine = episodes.filter(e => e.status === stage);
+    if (!mine.length) col.append(el("div", { class: "empty" }, "Nothing here yet"));
+
+    /* DRAG & DROP, in plain words:
+       - each card is "draggable" and remembers its id when you pick it up (dragstart)
+       - a column says "you can drop here" (dragover must cancel the default)
+       - when dropped, we find the card by id and change its status to this column's stage */
+    col.addEventListener("dragover", e => { e.preventDefault(); col.classList.add("dragover"); });
+    col.addEventListener("dragleave", () => col.classList.remove("dragover"));
+    col.addEventListener("drop", e => {
+      e.preventDefault(); col.classList.remove("dragover");
+      const ep = episodes.find(x => x.id === e.dataTransfer.getData("text/plain"));
+      if (ep) { ep.status = stage; saveAll(); }
+    });
+
+    mine.forEach(ep => {
+      const card = el("div", { class: "ep accent-" + ep.channel, draggable: "true" },
+        chip(ep.channel), ep.isShort ? el("span", { class: "chip Short" }, "⚡ Short") : "",
+        el("h4", { onclick: () => openEpisode(ep) }, ep.title),
+        el("p", {}, ep.desc),
+        el("div", { class: "moves" },
+          el("button", { class: "btn small ghost", onclick: () => shift(ep, -1) }, "◀"),
+          el("button", { class: "btn small ghost", onclick: () => openEpisode(ep) }, "✏️ notes"),
+          el("button", { class: "btn small green", onclick: () => shift(ep, +1) }, "▶")
+        ));
+      card.addEventListener("dragstart", e => e.dataTransfer.setData("text/plain", ep.id));
+      col.append(card);
+    });
+    return col;
+  }));
+}
+
+// ----- the edit / new-episode pop-up -----
+let editingId = null; // null means "creating a new one"
+STAGES.forEach(s => $("epStatus").append(el("option", {}, s)));
+
+function openEpisode(ep) {
+  editingId = ep ? ep.id : null;
+  $("epDialogTitle").textContent = ep ? "✏️ Edit episode" : "➕ New episode";
+  $("epTitle").value = ep ? ep.title : "";
+  $("epChannel").value = ep ? ep.channel : "Gaming";
+  $("epStatus").value = ep ? ep.status : "Idea";
+  $("epDesc").value = ep ? ep.desc : "";
+  $("epTitleOpts").value = ep ? ep.titleOpts : "";
+  $("epThumb").value = ep ? ep.thumb : "";
+  $("epHook").value = ep ? ep.hook : "";
+  $("epPunish").value = ep ? ep.punish : "";
+  $("epDelete").hidden = !ep;
+  $("epDialog").showModal();
+}
+$("newEpBtn").addEventListener("click", () => openEpisode(null));
+$("epCancel").addEventListener("click", () => $("epDialog").close());
+$("epDelete").addEventListener("click", e => twoTapDelete(e.currentTarget, "🗑️ Delete", () => {
+  episodes = episodes.filter(x => x.id !== editingId);
+  $("epDialog").close(); saveAll();
+}));
+$("epForm").addEventListener("submit", () => {
+  const data = {
+    title: $("epTitle").value.trim(), channel: $("epChannel").value, status: $("epStatus").value, desc: $("epDesc").value.trim(),
+    titleOpts: $("epTitleOpts").value, thumb: $("epThumb").value, hook: $("epHook").value, punish: $("epPunish").value
+  };
+  if (editingId) Object.assign(episodes.find(e => e.id === editingId), data);
+  else episodes.push({ id: newId(), ...data });
+  saveAll();
+});
+
+/* ---------- 4d. FUN EXTRAS ---------- */
+// "Spinning" = flash random choices quickly, then slow down and land on one.
+function shuffleReveal(box, list, done) {
+  let delay = 50, count = 0;
+  (function tick() {
+    box.textContent = pick(list);
+    count++;
+    if (count < 22) { delay += 12; setTimeout(tick, delay); }
+    else if (done) done(box.textContent);
+  })();
+}
+$("punishBtn").addEventListener("click", () => shuffleReveal($("punishBox"), PUNISHMENTS));
+$("introBtn").addEventListener("click", () => { $("introOut").textContent = pick(INTROS); });
+$("titleBtn").addEventListener("click", () => {
+  $("titleOut").textContent = `${pick(TITLE_WHO)} ${pick(TITLE_WHAT)} ${pick(TITLE_HOOK)}`;
+});
+
+/* ---------- 4e. EXPORT & IMPORT ----------
+   Export: bundle our three lists into one JSON text file and make the browser
+   download it (we build a "Blob" = a file that only exists in memory).
+   Import: read a chosen file back into text, check it looks right, then MERGE
+   it into our lists using each item's unique id. */
+$("exportBtn").addEventListener("click", () => {
+  const bundle = { app: "triple-e-planner", version: 1, ideas, shorts, episodes };
+  const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+  const link = el("a", { href: URL.createObjectURL(blob), download: "triple-e-planner-" + new Date().toISOString().slice(0, 10) + ".json" });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  showToast("⬇️ Saved a planner file! Check your Downloads.");
+});
+
+$("importBtn").addEventListener("click", () => $("importFile").click());
+
+// Add imported items to a list. Same item => replace ours, new item => add it.
+// "Same" means the same id, OR the same title + channel (every copy of the app
+// makes its own random ids for the starter ideas, so ids alone would duplicate them).
+function mergeById(mine, theirs) {
+  const result = [...mine];
+  theirs.forEach(item => {
+    const i = result.findIndex(x => x.id === item.id || (x.title === item.title && x.channel === item.channel));
+    if (i >= 0) result[i] = item; else result.push(item);
+  });
+  return result;
+}
+
+$("importFile").addEventListener("change", e => {
+  const file = e.target.files[0];
+  e.target.value = ""; // lets you pick the same file again later
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (data.app !== "triple-e-planner") throw new Error("not ours");
+      const before = ideas.length + shorts.length + episodes.length;
+      ideas = mergeById(ideas, data.ideas || []);
+      shorts = mergeById(shorts, data.shorts || []);
+      episodes = mergeById(episodes, data.episodes || []);
+      const added = ideas.length + shorts.length + episodes.length - before;
+      saveAll();
+      showToast("⬆️ Imported! " + added + " new item" + (added === 1 ? "" : "s") + " added.");
+    } catch (err) {
+      showToast("😕 That file doesn't look like a Triple E planner file.");
+    }
+  };
+  reader.readAsText(file);
+});
+
+/* ---------- Draw everything ---------- */
+function renderAll() { renderStats(); renderBank(); renderShorts(); renderBoard(); }
+renderAll();
+</script>
+</body>
+</html>
