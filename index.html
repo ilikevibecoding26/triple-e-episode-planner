@@ -313,6 +313,11 @@
       <label for="boardWho" style="margin:0">🙋 Show cards for:</label>
       <select id="boardWho" style="width:auto"></select>
     </div>
+    <!-- Shows up when the filter is hiding some cards, so they never "disappear" by surprise -->
+    <div id="filterNote" class="row" style="justify-content:flex-start;margin-bottom:10px" hidden>
+      <span id="filterNoteText" style="font-weight:bold"></span>
+      <button class="btn small purple" type="button" id="filterShowAll">Show everyone</button>
+    </div>
     <div id="board"></div>
   </section>
 
@@ -867,6 +872,7 @@ function addEpisode({ title, channel, desc, isShort = false }) {
                   filmDate: "", postDate: "", jobs: [], checklist: defaultChecklist() });
   saveAll();
   showToast("✅ \"" + title + "\" was sent to the Planner!");
+  revealIfHidden(episodes[episodes.length - 1]);
 }
 
 // Delete safety check WITHOUT a pop-up (browsers sometimes block pop-ups).
@@ -897,6 +903,7 @@ function shift(ep, dir) {
 
 function renderBoard() {
   renderWhoPicker();
+  renderFilterNote();
   renderComingUp();
   $("board").replaceChildren(...STAGES.map(stage => {
     const col = el("div", { class: "col", "data-stage": stage }, el("h3", {}, stage));
@@ -999,6 +1006,7 @@ $("epForm").addEventListener("submit", () => {
   const existing = editingId && episodes.find(e => e.id === editingId);
   if (existing) Object.assign(existing, data);
   else episodes.push({ id: editingId || newId(), checklist: defaultChecklist(), ...data });
+  revealIfHidden(existing || episodes[episodes.length - 1]);
   saveAll();
 });
 
@@ -1638,6 +1646,12 @@ function visibleEpisodes() {
   return episodes.filter(ep => (ep.jobs || []).some(j => j.who === boardWho));
 }
 
+function renderFilterNote() {
+  const hidden = episodes.length - visibleEpisodes().length;
+  $("filterNote").hidden = boardWho === "Everyone";
+  $("filterNoteText").textContent = "👀 Showing only " + boardWho + "'s cards" + (hidden ? " — " + hidden + " hidden" : "");
+}
+
 function renderWhoPicker() {
   const names = familyNames();
   if (boardWho !== "Everyone" && !names.includes(boardWho)) names.push(boardWho);
@@ -1646,11 +1660,21 @@ function renderWhoPicker() {
     ...names.map(n => el("option", { value: n }, n === myName() ? n + " (me)" : n)));
   picker.value = boardWho;
 }
-$("boardWho").addEventListener("change", () => {
-  boardWho = $("boardWho").value;
+// If the "Show cards for" filter would hide a card you just made, switch back to Everyone
+function revealIfHidden(ep) {
+  if (!ep || boardWho === "Everyone" || visibleEpisodes().includes(ep)) return;
+  setBoardWho("Everyone");
+  showToast("👀 Showing everyone's cards so you can see \"" + ep.title + "\"");
+}
+
+function setBoardWho(who) {
+  boardWho = who;
   save("tes_board_who", boardWho);
   renderBoard();
-});
+}
+$("filterShowAll").addEventListener("click", () => setBoardWho("Everyone"));
+
+$("boardWho").addEventListener("change", () => setBoardWho($("boardWho").value));
 
 /* ---------- 4o. CHECKLIST ----------
    Each card has a list like [{ id, text, done }]. Ticking a box saves straight away
