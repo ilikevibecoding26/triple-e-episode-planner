@@ -241,7 +241,8 @@
       <p>Type your secret <b>family code</b> so all three of you share ONE planner. Everyone must use the exact same code!</p>
       <div id="familyJoin">
         <div class="row">
-          <input id="familyCode" type="password" autocomplete="off" placeholder="Secret family code (6+ letters)" style="max-width:320px">
+          <input id="familyCode" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Secret family code (6+ letters)" style="max-width:320px">
+          <button class="btn small ghost" id="familyPeekBtn" type="button">🙈 Hide</button>
           <button class="btn green" id="familyJoinBtn">🔗 Connect</button>
         </div>
         <p><small>🤫 Don't post your code anywhere public. Anyone who knows it can change your planner.</small></p>
@@ -943,6 +944,14 @@ function renderSync() {
   $("syncPill").textContent = text;
   $("familyStatus").textContent = text;
 }
+
+// Show or hide the code as you type ("password" type shows dots instead of letters)
+$("familyPeekBtn").addEventListener("click", () => {
+  const box = $("familyCode");
+  const hidden = box.type === "password";
+  box.type = hidden ? "text" : "password";
+  $("familyPeekBtn").textContent = hidden ? "🙈 Hide" : "👁️ Show";
+});
 
 $("familyJoinBtn").addEventListener("click", async () => {
   const code = $("familyCode").value.trim();
