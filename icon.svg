@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c3aed"/><stop offset="0.55" stop-color="#ec4899"/><stop offset="1" stop-color="#f97316"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- clapperboard -->
+  <g transform="translate(96 108)">
+    <g transform="rotate(-12 0 70)">
+      <rect x="0" y="40" width="320" height="58" rx="10" fill="#2b2160"/>
+      <path d="M30 40 L78 40 L48 98 L0 98 Z M126 40 L174 40 L144 98 L96 98 Z M222 40 L270 40 L240 98 L192 98 Z" fill="#ffffff"/>
+    </g>
+    <rect x="0" y="104" width="320" height="200" rx="18" fill="#2b2160"/>
+    <rect x="0" y="104" width="320" height="58" rx="10" fill="#2b2160"/>
+    <path d="M30 104 L78 104 L48 162 L0 162 Z M126 104 L174 104 L144 162 L96 162 Z M222 104 L270 104 L240 162 L192 162 Z" fill="#ffffff"/>
+    <text x="160" y="268" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="104" fill="#facc15" letter-spacing="6">EEE</text>
+  </g>
+</svg>

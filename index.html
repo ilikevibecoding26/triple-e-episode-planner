@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Triple E Studios — Episode Planner</title>
+<!-- 📱 These let you add the planner to a phone/iPad home screen like a real app -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Triple E">
+<meta name="theme-color" content="#7c3aed">
 <style>
   /* ============ COLORS ============
      Each channel has its own color. Change these to re-theme the whole app! */
@@ -37,6 +45,8 @@
   }
   html.dark header { border-bottom-color: #0b0818; }
   * { box-sizing: border-box; }
+  /* "hidden" must ALWAYS hide things, even boxes that other rules make display:flex */
+  [hidden] { display: none !important; }
   body {
     margin: 0; color: var(--ink); background: var(--bg);
     font-family: "Baloo 2", "Comic Sans MS", "Chalkboard SE", "Marker Felt", system-ui, sans-serif;
@@ -189,6 +199,49 @@
   #thumbCanvas { width: 100%; height: auto; display: block; border: 4px solid var(--ink); border-radius: 14px; }
   .thumb-mini { width: 128px; height: 72px; border: 2px solid var(--ink); border-radius: 8px; object-fit: cover; cursor: pointer; }
   .ep .thumb-mini { width: 100%; height: auto; display: block; margin: 4px 0 6px; }
+  /* ---- Idea mashup ---- */
+  .idea-big { margin: 14px auto; max-width: 640px; border-radius: 24px; padding: 18px; border: 4px solid var(--ink); background: var(--purple-soft); }
+  .idea-big h3 { font-size: 1.5rem; margin: 8px 0; }
+  /* ---- Calendar ---- */
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .cal-dayname { text-align: center; font-weight: bold; font-size: .8rem; }
+  .cal-cell { min-height: 84px; border: 2px solid var(--ink); border-radius: 10px; padding: 3px; background: var(--card-alt); overflow: hidden; }
+  .cal-cell.other { opacity: .4; }
+  .cal-cell.today { border-color: var(--pink); border-width: 4px; }
+  .cal-num { font-size: .8rem; font-weight: bold; }
+  .cal-ev { display: block; font-size: .7rem; line-height: 1.2; margin-top: 2px; padding: 2px 4px; border-radius: 6px; color: white; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cal-ev.film { background: #ef4444; } .cal-ev.post { background: var(--purple); }
+  .cal-ev.late { outline: 2px dashed #facc15; }
+  /* ---- Timer ---- */
+  #timerDisplay { font-size: clamp(3.5rem, 16vw, 9rem); font-weight: bold; font-variant-numeric: tabular-nums; margin: 10px 0; line-height: 1.1; }
+  #timerPanel.times-up #timerDisplay { color: #ef4444; animation: pop .4s ease 3; }
+  #timerPanel:fullscreen { display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg); border: none; border-radius: 0; }
+  #timerPanel:fullscreen #timerDisplay { font-size: 24vw; }
+  #timerPanel:-webkit-full-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg); }
+  #lapList { text-align: left; max-width: 320px; margin: 10px auto 0; font-variant-numeric: tabular-nums; }
+  /* ---- Who goes first ---- */
+  #orderResult { font-size: 1.3rem; font-weight: bold; }
+  #orderResult ol { display: inline-block; text-align: left; margin: 6px 0; padding: 0; list-style: none; }
+  .teams { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .team { border: 3px solid var(--ink); border-radius: 16px; padding: 10px 18px; min-width: 140px; }
+  .team.blue { background: #dbeafe; color: #1e3a8a; } .team.red { background: #fee2e2; color: #7f1d1d; }
+  /* ---- Scoreboard ---- */
+  .lb-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-weight: bold; }
+  .lb-medal { width: 2rem; text-align: center; font-size: 1.4rem; }
+  .lb-name { width: 7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-bar { flex: 1; height: 26px; border: 2px solid var(--ink); border-radius: 999px; overflow: hidden; background: var(--card-alt); }
+  .lb-fill { height: 100%; background: linear-gradient(90deg, var(--pink), var(--challenge)); }
+  .lb-count { width: 4.5rem; text-align: right; }
+  #winList { list-style: none; padding: 0; }
+  #winList li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 2px dashed var(--purple-soft); }
+  #winList li span { flex: 1; }
+  /* ---- Shot list ---- */
+  #epShots { border-top: 3px dashed var(--ink); margin-top: 8px; }
+  #shotItems { padding-left: 1.6rem; margin: 6px 0; }
+  #shotItems li { padding: 3px 0; }
+  #shotItems .check-item { padding: 0; }
+  #shotItems .check-item button { opacity: .6; }
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, calc(100% + 40px)); opacity: 0; z-index: 10;
     background: var(--gaming); color: white; font-weight: bold; padding: 14px 22px;
@@ -212,6 +265,7 @@
   <button class="tab" data-page="bank">💡 Idea Bank</button>
   <button class="tab" data-page="shorts">⚡ Shorts</button>
   <button class="tab" data-page="planner">📋 Planner</button>
+  <button class="tab" data-page="filming">🎬 Filming</button>
   <button class="tab" data-page="chat">💬 Chat <span id="chatBadge" class="badge" hidden></span></button>
   <button class="tab" data-page="extras">🎉 Fun Extras</button>
   <button class="tab" data-page="settings" title="Settings">⚙️ Settings</button>
@@ -242,6 +296,16 @@
         <button class="btn orange" id="againBtn">🔄 Give me another!</button>
         <button class="btn green" id="sendBtn">📋 Send to Planner</button>
         <button class="btn purple" id="usedBtn">✅ Already did this one</button>
+      </div>
+    </div>
+    <div class="panel center">
+      <h2>🤪 Idea Mashup</h2>
+      <p>Smoosh two ideas together, or add a crazy twist!</p>
+      <p><button class="btn big purple" id="mashBtn">🤪 Mash up ideas!</button></p>
+      <div id="mashCard" class="idea-big" hidden></div>
+      <div class="row" id="mashActions" hidden>
+        <button class="btn orange" id="mashAgainBtn">🔄 Another mashup!</button>
+        <button class="btn green" id="mashSendBtn">📋 Send to Planner</button>
       </div>
     </div>
   </section>
@@ -318,7 +382,71 @@
       <span id="filterNoteText" style="font-weight:bold"></span>
       <button class="btn small purple" type="button" id="filterShowAll">Show everyone</button>
     </div>
+    <div class="row" style="justify-content:flex-start;margin-bottom:10px">
+      <button class="btn small" type="button" id="viewBoardBtn">📋 Board</button>
+      <button class="btn small ghost" type="button" id="viewCalBtn">🗓️ Calendar</button>
+    </div>
     <div id="board"></div>
+    <div id="calendar" class="panel" hidden></div>
+  </section>
+
+  <!-- ===================== FILMING ===================== -->
+  <section class="page" id="page-filming">
+    <div class="panel center" id="timerPanel">
+      <h2>⏱️ Challenge Timer</h2>
+      <div class="row">
+        <button class="btn small" type="button" id="modeStopwatch">⏱️ Stopwatch</button>
+        <button class="btn small ghost" type="button" id="modeCountdown">⏳ Countdown</button>
+      </div>
+      <div class="row" id="countdownSet" hidden style="margin-top:10px">
+        <button class="btn small ghost" type="button" data-secs="10">10 sec</button>
+        <button class="btn small ghost" type="button" data-secs="30">30 sec</button>
+        <button class="btn small ghost" type="button" data-secs="60">1 min</button>
+        <button class="btn small ghost" type="button" data-secs="120">2 min</button>
+        <button class="btn small ghost" type="button" data-secs="300">5 min</button>
+        <button class="btn small ghost" type="button" data-add="-10">−10s</button>
+        <button class="btn small ghost" type="button" data-add="10">+10s</button>
+      </div>
+      <div id="timerDisplay">0:00.0</div>
+      <div class="row">
+        <button class="btn big green" type="button" id="timerStart">▶ Start</button>
+        <button class="btn orange" type="button" id="timerLap">🏁 Lap</button>
+        <button class="btn ghost" type="button" id="timerReset">↺ Reset</button>
+        <button class="btn purple" type="button" id="timerFull">⛶ Full screen</button>
+      </div>
+      <label class="check-item" style="justify-content:center;margin-top:10px">
+        <input type="checkbox" id="timerBeeps" checked> <span style="flex:none">🔊 Beeps</span>
+      </label>
+      <ol id="lapList"></ol>
+    </div>
+
+    <div class="panel center">
+      <h2>🎲 Who goes first?</h2>
+      <label for="orderNames">Names (separate with commas)</label>
+      <input id="orderNames" placeholder="e.g. Alex, Sam, Jordan">
+      <p class="row">
+        <button class="btn orange" type="button" id="orderBtn">🎲 Pick the order</button>
+        <button class="btn purple" type="button" id="teamsBtn">👥 Make 2 teams</button>
+      </p>
+      <div id="orderResult"></div>
+    </div>
+
+    <div class="panel">
+      <h2 class="center" style="margin-top:0">🏆 Sibling Scoreboard</h2>
+      <div id="scoreOff" class="empty">Connect with your family code (⚙️ Settings) to keep score together!</div>
+      <div id="scoreOn" hidden>
+        <div id="leaderboard"></div>
+        <form id="winForm" class="row" style="margin:14px 0">
+          <input id="winWho" list="scoreNames" maxlength="30" placeholder="Who won? 🏆" style="flex:1 1 140px;width:auto;min-width:0">
+          <input id="winWhat" list="challengeNames" maxlength="80" placeholder="Which challenge?" style="flex:2 1 200px;width:auto;min-width:0">
+          <button class="btn green" type="submit">🏆 Add win</button>
+        </form>
+        <datalist id="scoreNames"></datalist>
+        <datalist id="challengeNames"></datalist>
+        <h3>Recent wins</h3>
+        <ul id="winList"></ul>
+      </div>
+    </div>
   </section>
 
   <!-- ===================== CHAT ===================== -->
@@ -387,6 +515,14 @@
           <input type="checkbox" id="emojiToggle" role="switch" aria-label="Show emojis">
           <span class="slider"></span>
         </label>
+      </div>
+      <div class="setting" style="margin-top:10px">
+        <div>
+          <div class="setting-name">📱 Put it on your home screen</div>
+          <div class="setting-help"><b>iPad/iPhone:</b> in Safari tap the Share button <b>⬆️</b>, then <b>Add to Home Screen</b>.
+            <b>Android/Chrome:</b> tap the <b>⋮</b> menu, then <b>Add to Home screen</b>.
+            The app opens full-screen with its own icon! (It's a separate copy: connect your family code and set your name again inside it.)</div>
+        </div>
       </div>
     </div>
     <div class="panel center" id="familyPanel">
@@ -492,7 +628,17 @@
       <button class="btn small green" type="submit">Add</button>
     </form>
   </div>
-  <div id="checkOff" class="empty">💾 Save this new card first, then it gets a checklist!</div>
+  <!-- 🎬 Shot list: the scenes to film, in order (saves right away, like the checklist) -->
+  <div id="epShots">
+    <h3 style="margin-bottom:6px">🎥 Shot list <span id="shotProgress"></span></h3>
+    <ol id="shotItems"></ol>
+    <button class="btn small purple" type="button" id="shotStarterBtn">➕ Add starter shots</button>
+    <form id="shotForm" class="row" style="flex-wrap:nowrap;margin-top:6px">
+      <input id="shotText" maxlength="80" autocomplete="off" placeholder="Next scene, e.g. Explain the rules">
+      <button class="btn small green" type="submit">Add</button>
+    </form>
+  </div>
+  <div id="checkOff" class="empty">💾 Save this new card first, then it gets a checklist and shot list!</div>
   <!-- Comments live OUTSIDE the form above, so sending a comment doesn't close the pop-up -->
   <div id="epComments">
     <h3 style="margin-bottom:6px">💬 Family comments</h3>
@@ -905,6 +1051,12 @@ function renderBoard() {
   renderWhoPicker();
   renderFilterNote();
   renderComingUp();
+  // 📋 Board or 🗓️ Calendar?
+  $("board").hidden = planView === "calendar";
+  $("calendar").hidden = planView !== "calendar";
+  $("viewBoardBtn").className = "btn small" + (planView === "calendar" ? " ghost" : "");
+  $("viewCalBtn").className = "btn small" + (planView === "calendar" ? "" : " ghost");
+  if (planView === "calendar") renderCalendar();
   $("board").replaceChildren(...STAGES.map(stage => {
     const col = el("div", { class: "col", "data-stage": stage }, el("h3", {}, stage));
     const mine = byVotes(visibleEpisodes().filter(e => e.status === stage)); // most votes at the top
@@ -971,6 +1123,7 @@ function openEpisode(ep, jumpToComments = false) {
   $("jobWho").value = "";
   renderJobs();
   renderChecklist();
+  renderShots();
   $("epDelete").hidden = !ep;
   renderComments();
   if (ep) markCommentsSeen(ep.id);
@@ -1230,6 +1383,7 @@ function renderSync() {
   $("syncPill").textContent = text;
   $("familyStatus").textContent = text;
   if (typeof renderChatState === "function") renderChatState();
+  if (typeof renderScoreboard === "function") renderScoreboard();
 }
 
 // Show or hide the code as you type ("password" type shows dots instead of letters)
@@ -1247,7 +1401,8 @@ $("familyJoinBtn").addEventListener("click", async () => {
   try {
     const isNew = await joinFamily(code);
     $("familyCode").value = "";
-    newsMsgId = null; newsCmtId = null; saveNewsIds();
+    newsMsgId = null; newsCmtId = null; newsWinId = null; saveNewsIds();
+    wins = []; pullWins();
     resetChat(); pullMessages();
     resetComments(); pullComments(); pullVotes();
     showToast(isNew ? "🎉 New family planner made! Give your siblings the same code."
@@ -1265,6 +1420,7 @@ $("familyLeaveBtn").addEventListener("click", e => twoTapDelete(e.currentTarget,
   try { localStorage.removeItem("tes_family_code"); } catch (err) {}
   saveSyncState(); renderSync(); resetChat(); resetComments();
   votesByItem = {}; renderBank(); renderShorts(); renderBoard();
+  wins = []; renderScoreboard();
   showToast("📴 Disconnected. This device keeps its own copy now.");
 }));
 
@@ -1432,7 +1588,7 @@ $("commentForm").addEventListener("submit", async e => {
 });
 
 // Check for siblings' changes (and new messages) every 5 seconds, and right away when you come back
-setInterval(() => { pushChanges(); pullChanges(); pullMessages(); pullComments(); pullChannelName(); pullVotes(); }, 5000);
+setInterval(() => { pushChanges(); pullChanges(); pullMessages(); pullComments(); pullChannelName(); pullVotes(); pullWins(); }, 5000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { pullChanges(); pullMessages(); pullComments(); } });
 
 /* ---------- 4i. SETTINGS: EMOJI ON/OFF ----------
@@ -1585,6 +1741,8 @@ function cardMeta(ep) {
   (ep.jobs || []).forEach(j => bits.push(el("span", {}, "🙋 " + j.who + ": " + j.what)));
   const list = ep.checklist || [];
   if (list.length) bits.push(el("span", {}, ico("✅", "Done:") + " " + list.filter(c => c.done).length + "/" + list.length));
+  const shots = ep.shots || [];
+  if (shots.length) bits.push(el("span", {}, ico("🎥", "Shots:") + " " + shots.filter(c => c.done).length + "/" + shots.length));
   return bits.length ? el("div", { class: "meta" }, ...bits) : "";
 }
 
@@ -1793,7 +1951,8 @@ async function castVote(idea, value) {
 let news = load("tes_news", []);           // [{ text, at }] newest first
 let newsMsgId = load("tes_news_msg", null); // newest chat message we already turned into news
 let newsCmtId = load("tes_news_cmt", null); // newest comment we already turned into news
-function saveNewsIds() { save("tes_news_msg", newsMsgId); save("tes_news_cmt", newsCmtId); }
+let newsWinId = load("tes_news_win", null); // newest scoreboard win we already turned into news
+function saveNewsIds() { save("tes_news_msg", newsMsgId); save("tes_news_cmt", newsCmtId); save("tes_news_win", newsWinId); }
 
 function addNews(text) {
   if (news[0] && news[0].text === text) return; // don't repeat the exact same line
@@ -2262,10 +2421,371 @@ $("thumbDownload").addEventListener("click", () => {
   showToast("⬇️ Thumbnail downloaded! Check your Downloads.");
 });
 
+/* ---------- 4t. IDEA MASHUP ----------
+   Two ways to make a brand-new idea:
+   1) glue two ideas together: "Boat Race + Floor Is Lava Parkour"
+   2) add a crazy twist to one idea: "Boat Race (but in Hardcore Mode!)" */
+const TWISTS = {
+  Challenge: ["but BLINDFOLDED", "but in the DARK", "but the youngest is in charge", "in only 60 seconds",
+              "but nobody can talk", "with the punishment wheel", "but everything is backwards", "but in slow motion"],
+  Gaming:    ["but in Hardcore Mode", "but with only one block type", "but we swap halfway", "in 10 minutes",
+              "but whatever we mine we must use", "on a one-block island", "but no jumping allowed", "but in the Nether"]
+};
+let currentMash = null;
+
+function makeMashup() {
+  const channel = chosenChannel(); // uses the same channel picker as the big Spin button
+  const pool = ideas.filter(i => !i.used && (channel === "Any" || i.channel === channel));
+  if (pool.length < 2) { showToast("😕 Not enough ideas to mash up! Add some in the Idea Bank."); return; }
+  const a = pick(pool);
+  if (Math.random() < 0.5) {
+    const b = pick(pool.filter(i => i.id !== a.id));
+    currentMash = { title: a.title + " + " + b.title, channel: a.channel, desc: a.desc + " PLUS: " + b.desc };
+  } else {
+    const twist = pick(TWISTS[a.channel] || TWISTS.Challenge);
+    currentMash = { title: a.title + " (" + twist + "!)", channel: a.channel, desc: a.desc + " Twist: " + twist + "!" };
+  }
+  const card = $("mashCard");
+  card.hidden = false;
+  card.replaceChildren(chip(currentMash.channel), el("h3", {}, currentMash.title), el("p", {}, currentMash.desc));
+  card.classList.remove("pop"); void card.offsetWidth; card.classList.add("pop");
+  $("mashActions").hidden = false;
+}
+$("mashBtn").addEventListener("click", makeMashup);
+$("mashAgainBtn").addEventListener("click", makeMashup);
+$("mashSendBtn").addEventListener("click", () => { if (currentMash) addEpisode({ ...currentMash }); });
+
+/* ---------- 4u. CALENDAR VIEW ----------
+   A month grid. Each film date shows as a red 🎬 chip, each post date as a purple 📤 chip.
+   Tap a chip to open that card. */
+let planView = load("tes_plan_view", "board");   // "board" or "calendar"
+let calMonth = todayStr().slice(0, 7);           // which month is showing, like "2026-10"
+
+function setPlanView(view) { planView = view; save("tes_plan_view", view); renderBoard(); }
+$("viewBoardBtn").addEventListener("click", () => setPlanView("board"));
+$("viewCalBtn").addEventListener("click", () => setPlanView("calendar"));
+
+function shiftMonth(n) {
+  const [y, m] = calMonth.split("-").map(Number);
+  const d = new Date(y, m - 1 + n, 1);
+  calMonth = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const [y, m] = calMonth.split("-").map(Number);
+  const first = new Date(y, m - 1, 1);
+  const monthName = first.toLocaleDateString([], { month: "long", year: "numeric" });
+  // Find every film/post date for the cards we're showing
+  const events = {};
+  visibleEpisodes().forEach(ep => {
+    if (ep.filmDate) (events[ep.filmDate] = events[ep.filmDate] || []).push({ ep, kind: "film", late: filmLate(ep) });
+    if (ep.postDate) (events[ep.postDate] = events[ep.postDate] || []).push({ ep, kind: "post", late: postLate(ep) });
+  });
+  // The grid starts on the Sunday before the 1st, and runs 6 weeks
+  const start = addDays(calMonth + "-01", -first.getDay());
+  const cells = [];
+  for (let i = 0; i < 42; i++) {
+    const day = addDays(start, i);
+    const cell = el("div", { class: "cal-cell" + (day.slice(0, 7) !== calMonth ? " other" : "") + (day === todayStr() ? " today" : "") },
+      el("div", { class: "cal-num" }, String(Number(day.slice(8)))));
+    (events[day] || []).forEach(ev => cell.append(el("span", {
+      class: "cal-ev " + ev.kind + (ev.late ? " late" : ""),
+      title: (ev.kind === "film" ? "Film: " : "Post: ") + ev.ep.title + (ev.late ? " (late!)" : ""),
+      onclick: () => openEpisode(ev.ep)
+    }, (ev.kind === "film" ? "🎬 " : "📤 ") + ev.ep.title)));
+    cells.push(cell);
+  }
+  // Skip the 6th week if it's all next month
+  if (cells.slice(35).every(c => c.classList.contains("other"))) cells.length = 35;
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => el("div", { class: "cal-dayname" }, d));
+  $("calendar").replaceChildren(
+    el("div", { class: "cal-head" },
+      el("button", { class: "btn small ghost", type: "button", onclick: () => shiftMonth(-1) }, "◀"),
+      el("h2", { style: "margin:0" }, "🗓️ " + monthName),
+      el("button", { class: "btn small ghost", type: "button", onclick: () => shiftMonth(1) }, "▶")),
+    el("div", { class: "cal-grid" }, ...dayNames, ...cells),
+    el("p", { class: "center" }, el("small", {}, "🎬 = film day · 📤 = post day · dashed yellow = late. Tap one to open the card!")));
+}
+
+/* ---------- 4v. SHOT LIST ----------
+   Like the checklist, but it's the scenes you'll film, IN ORDER.
+   ▲ ▼ move a scene up or down. Ticking a scene means "filmed it!" */
+const STARTER_SHOTS = ["Intro + hook", "Explain the rules", "Round 1", "Round 2", "Final round",
+                       "Winner + punishment", "Outro: like & subscribe!"];
+
+function renderShots() {
+  const ep = openCard();
+  $("epShots").hidden = !ep;
+  if (!ep) return;
+  const shots = ep.shots || [];
+  const done = shots.filter(c => c.done).length;
+  $("shotProgress").textContent = shots.length ? "(" + done + "/" + shots.length + " filmed)" : "";
+  $("shotStarterBtn").hidden = shots.length > 0;
+  const move = (i, dir) => {
+    const j = i + dir;
+    if (j < 0 || j >= shots.length) return;
+    [shots[i], shots[j]] = [shots[j], shots[i]]; // swap the two scenes
+    ep.shots = shots; saveAll();
+  };
+  $("shotItems").replaceChildren(...shots.map((shot, i) => {
+    const box = el("input", { type: "checkbox" });
+    box.checked = shot.done;
+    box.addEventListener("change", () => { shot.done = box.checked; saveAll(); });
+    const btn = (label, title, fn) => el("button", { type: "button", title, onclick: e => { e.preventDefault(); fn(); } }, label);
+    return el("li", {}, el("label", { class: "check-item" + (shot.done ? " done" : "") }, box, el("span", {}, shot.text),
+      btn("▲", "Move up", () => move(i, -1)), btn("▼", "Move down", () => move(i, 1)),
+      btn("✕", "Remove scene", () => { ep.shots = shots.filter(x => x.id !== shot.id); saveAll(); })));
+  }));
+}
+$("shotStarterBtn").addEventListener("click", () => {
+  const ep = openCard(); if (!ep) return;
+  ep.shots = STARTER_SHOTS.map(text => ({ id: newId(), text, done: false })); saveAll();
+});
+$("shotForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const ep = openCard(); const text = $("shotText").value.trim();
+  if (!ep || !text) return;
+  ep.shots = [...(ep.shots || []), { id: newId(), text, done: false }];
+  $("shotText").value = "";
+  saveAll();
+});
+
+/* ---------- 4w. CHALLENGE TIMER ----------
+   Stopwatch counts UP, countdown counts DOWN to zero.
+   We don't count "ticks" (those drift); we remember WHEN we started and
+   subtract from the current time, so it's always exact. */
+let timerMode = "stopwatch";
+let timerRunning = false;
+let timerStartedAt = 0;   // performance.now() when Start was pressed (minus time already counted)
+let timerElapsed = 0;     // milliseconds counted so far
+let countdownLength = 30000;
+let lastBeepSecond = null;
+let laps = [];
+let audio = null;         // the browser's sound maker (made on the first Start press)
+let wakeLock = null;      // keeps the screen from going to sleep while the timer runs
+let timerTick = null;     // redraws the clock 20 times a second while it's running
+
+function beep(freq = 880, ms = 150) {
+  if (!$("timerBeeps").checked) return;
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audio.createOscillator(), gain = audio.createGain();
+    osc.frequency.value = freq; osc.type = "square";
+    gain.gain.value = 0.15;
+    osc.connect(gain); gain.connect(audio.destination);
+    osc.start(); osc.stop(audio.currentTime + ms / 1000);
+  } catch (e) { /* no sound on this device, that's OK */ }
+}
+
+function formatTime(ms, tenths) {
+  const total = Math.max(0, ms);
+  const mins = Math.floor(total / 60000), secs = Math.floor(total / 1000) % 60;
+  return mins + ":" + String(secs).padStart(2, "0") + (tenths ? "." + Math.floor(total / 100) % 10 : "");
+}
+
+function timerNow() { return timerRunning ? performance.now() - timerStartedAt : timerElapsed; }
+
+function drawTimer() {
+  const ms = timerNow();
+  if (timerMode === "stopwatch") {
+    $("timerDisplay").textContent = formatTime(ms, true);
+  } else {
+    const left = countdownLength - ms;
+    // show tenths in the last 10 seconds, for drama
+    $("timerDisplay").textContent = left < 10000 ? formatTime(left, true) : formatTime(Math.ceil(left / 1000) * 1000, false);
+    const secLeft = Math.ceil(left / 1000);
+    if (timerRunning && secLeft <= 3 && secLeft > 0 && secLeft !== lastBeepSecond) { lastBeepSecond = secLeft; beep(660, 120); }
+    if (timerRunning && left <= 0) { timeUp(); return; }
+  }
+}
+function startTicking() { clearInterval(timerTick); timerTick = setInterval(drawTimer, 50); }
+function stopTicking() { clearInterval(timerTick); timerTick = null; }
+
+function timeUp() {
+  timerRunning = false; timerElapsed = countdownLength; stopTicking();
+  $("timerDisplay").textContent = "TIME'S UP!";
+  $("timerPanel").classList.add("times-up");
+  beep(440, 700);
+  setTimerButtons(); releaseWakeLock();
+}
+
+function setTimerButtons() {
+  $("timerStart").textContent = timerRunning ? "⏸ Pause" : "▶ Start";
+  $("timerStart").className = "btn big " + (timerRunning ? "orange" : "green");
+  $("timerLap").hidden = timerMode !== "stopwatch";
+}
+
+async function grabWakeLock() { try { wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {} }
+function releaseWakeLock() { try { if (wakeLock) wakeLock.release(); } catch (e) {} wakeLock = null; }
+
+$("timerStart").addEventListener("click", () => {
+  beep(0.0001, 1); // waking up the sound maker (browsers only allow sound after a tap)
+  if (timerRunning) {
+    timerElapsed = timerNow(); timerRunning = false; stopTicking(); releaseWakeLock();
+  } else {
+    if (timerMode === "countdown" && timerElapsed >= countdownLength) timerElapsed = 0; // start over after TIME'S UP
+    $("timerPanel").classList.remove("times-up");
+    timerStartedAt = performance.now() - timerElapsed; timerRunning = true; lastBeepSecond = null;
+    grabWakeLock();
+    startTicking();
+  }
+  setTimerButtons(); drawTimer();
+});
+
+$("timerReset").addEventListener("click", () => {
+  timerRunning = false; timerElapsed = 0; laps = []; stopTicking(); releaseWakeLock();
+  $("timerPanel").classList.remove("times-up");
+  $("lapList").replaceChildren();
+  setTimerButtons(); drawTimer();
+});
+
+$("timerLap").addEventListener("click", () => {
+  if (timerMode !== "stopwatch" || timerNow() === 0) return;
+  laps.push(timerNow());
+  $("lapList").replaceChildren(...laps.map((t, i) => el("li", {}, "🏁 " + formatTime(t, true) +
+    (i ? "  (+" + formatTime(t - laps[i - 1], true) + ")" : ""))));
+});
+
+function setTimerMode(mode) {
+  timerMode = mode;
+  $("modeStopwatch").className = "btn small" + (mode === "stopwatch" ? "" : " ghost");
+  $("modeCountdown").className = "btn small" + (mode === "countdown" ? "" : " ghost");
+  $("countdownSet").hidden = mode !== "countdown";
+  $("timerReset").click();
+}
+$("modeStopwatch").addEventListener("click", () => setTimerMode("stopwatch"));
+$("modeCountdown").addEventListener("click", () => setTimerMode("countdown"));
+
+// Countdown length buttons: "30 sec" sets it, "+10s" / "−10s" adds or takes away
+$("countdownSet").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.secs) countdownLength = Number(b.dataset.secs) * 1000;
+  if (b.dataset.add) countdownLength = Math.max(5000, countdownLength + Number(b.dataset.add) * 1000);
+  if (!timerRunning) { timerElapsed = 0; $("timerPanel").classList.remove("times-up"); }
+  drawTimer();
+});
+
+$("timerFull").addEventListener("click", () => {
+  const panel = $("timerPanel");
+  const isFull = document.fullscreenElement || document.webkitFullscreenElement;
+  if (isFull) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  else if (panel.requestFullscreen) panel.requestFullscreen().catch(() => showToast("😕 Full screen isn't allowed here."));
+  else if (panel.webkitRequestFullscreen) panel.webkitRequestFullscreen();
+  else showToast("😕 This device can't do full screen. Try turning it sideways!");
+});
+setTimerButtons(); drawTimer();
+
+/* ---------- 4x. WHO GOES FIRST? ---------- */
+// Shuffle = mix a list into a random order (the "Fisher–Yates" way: swap each spot with a random earlier one)
+function shuffle(list) {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function orderNames() { return $("orderNames").value.split(",").map(n => n.trim()).filter(Boolean); }
+$("orderNames").value = load("tes_order_names", "") || familyNames().join(", ");
+$("orderNames").addEventListener("change", () => save("tes_order_names", $("orderNames").value));
+
+// A quick "drum roll": flash random names, then show the real answer
+function drumroll(show) {
+  let flashes = 0;
+  const tick = () => {
+    $("orderResult").textContent = "🥁 " + pick(orderNames()) + "...";
+    if (++flashes < 10) setTimeout(tick, 70 + flashes * 15); else show();
+  };
+  tick();
+}
+
+$("orderBtn").addEventListener("click", () => {
+  const names = orderNames();
+  if (names.length < 2) { showToast("✏️ Type at least 2 names, with commas between them!"); return; }
+  const medals = ["🥇", "🥈", "🥉"];
+  drumroll(() => $("orderResult").replaceChildren(el("ol", {},
+    ...shuffle(names).map((n, i) => el("li", {}, (medals[i] || "⭐") + " " + n + (i === 0 ? " goes first!" : ""))))));
+});
+
+$("teamsBtn").addEventListener("click", () => {
+  const names = orderNames();
+  if (names.length < 2) { showToast("✏️ Type at least 2 names, with commas between them!"); return; }
+  const mixed = shuffle(names);
+  const blue = mixed.filter((_, i) => i % 2 === 0), red = mixed.filter((_, i) => i % 2 === 1);
+  drumroll(() => $("orderResult").replaceChildren(el("div", { class: "teams" },
+    el("div", { class: "team blue" }, el("div", {}, "🔵 Team Blue"), ...blue.map(n => el("div", {}, n))),
+    el("div", { class: "team red" }, el("div", {}, "🔴 Team Red"), ...red.map(n => el("div", {}, n))))));
+});
+
+/* ---------- 4y. SIBLING SCOREBOARD ----------
+   Every win is one row in the family database: { winner, challenge, added_by }.
+   The leaderboard just counts how many rows each person has. */
+let wins = [];
+
+async function pullWins() {
+  if (!familyCode) return;
+  try {
+    const rows = await callDb("get_wins", { code: familyCode });
+    // What's new: wins someone else added since last time
+    const newest = rows.length ? rows[0].id : 0;
+    if (newsWinId === null) { newsWinId = newest; saveNewsIds(); }
+    else {
+      rows.filter(w => w.id > newsWinId && w.added_by !== myName()).reverse()
+        .forEach(w => addNews(w.added_by === w.winner || !w.added_by
+          ? "🏆 " + w.winner + " won" + (w.challenge ? " " + quote(w.challenge) : "") + "!"
+          : "🏆 " + w.added_by + " gave " + w.winner + " a win" + (w.challenge ? " for " + quote(w.challenge) : "")));
+      if (newest > newsWinId) { newsWinId = newest; saveNewsIds(); }
+    }
+    if (JSON.stringify(rows) === JSON.stringify(wins)) return; // nothing changed
+    wins = rows;
+    renderScoreboard();
+  } catch (e) { /* offline: try later */ }
+}
+
+function renderScoreboard() {
+  $("scoreOff").hidden = !!familyCode;
+  $("scoreOn").hidden = !familyCode;
+  // count wins per person, most first
+  const counts = {};
+  wins.forEach(w => counts[w.winner] = (counts[w.winner] || 0) + 1);
+  const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const most = ranked.length ? ranked[0][1] : 1;
+  const medals = ["🥇", "🥈", "🥉"];
+  $("leaderboard").replaceChildren(...(ranked.length ? ranked.map(([name, n], i) =>
+    el("div", { class: "lb-row" },
+      el("span", { class: "lb-medal" }, medals[i] || "⭐"),
+      el("span", { class: "lb-name", title: name }, name),
+      el("span", { class: "lb-bar" }, el("span", { class: "lb-fill", style: "display:block;width:" + Math.round(n / most * 100) + "%" })),
+      el("span", { class: "lb-count" }, n + (n === 1 ? " win" : " wins"))))
+    : [el("div", { class: "empty" }, "No wins yet! Film a challenge, then add the winner below. 🏆")]));
+  $("winList").replaceChildren(...wins.slice(0, 30).map(w => el("li", {},
+    el("span", {}, "🏆 " + w.winner + (w.challenge ? " won " + quote(w.challenge) : " won") + " · " +
+      new Date(w.created_at).toLocaleDateString([], { month: "short", day: "numeric" })),
+    el("button", { class: "btn small ghost", type: "button", title: "Delete this win",
+      onclick: e => twoTapDelete(e.currentTarget, "✕", async () => {
+        try { await callDb("delete_win", { code: familyCode, win_id: w.id }); wins = wins.filter(x => x.id !== w.id); renderScoreboard(); }
+        catch (err) { showToast("😕 Couldn't delete. Check your internet!"); }
+      }) }, "✕"))));
+  // suggestions while typing
+  $("scoreNames").replaceChildren(...[...new Set([...familyNames(), ...Object.keys(counts)])].map(n => el("option", { value: n })));
+  $("challengeNames").replaceChildren(...[...new Set(episodes.map(e => e.title))].map(t => el("option", { value: t })));
+}
+
+$("winForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const winner = $("winWho").value.trim(), challenge = $("winWhat").value.trim();
+  if (!winner) { showToast("✏️ Type who won!"); $("winWho").focus(); return; }
+  try {
+    await callDb("add_win", { code: familyCode, winner, challenge, added_by: myName() });
+    $("winWho").value = ""; $("winWhat").value = "";
+    showToast("🏆 Win added for " + winner + "!");
+    pullWins();
+  } catch (err) { showToast("😕 Couldn't save the win. Check your internet!"); }
+});
+renderScoreboard();
+
 /* ---------- Draw everything ---------- */
 function renderAll() {
   renderStats(); renderBank(); renderShorts(); renderBoard();
-  if ($("epDialog").open) renderChecklist();
+  if ($("epDialog").open) { renderChecklist(); renderShots(); }
 }
 renderAll();
 
@@ -2286,6 +2806,7 @@ pullMessages();
 pullComments();
 pullChannelName();
 pullVotes();
+pullWins();
 </script>
 </body>
 </html>

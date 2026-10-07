@@ -29,6 +29,19 @@
 
 **🔔 What's new** — When a sibling adds or moves a card, ticks a checklist, adds an idea, chats or comments, a line shows up in the What's new box at the top (even if the app was closed). Press **Got it ✓** to clear it.
 
+**🎬 Filming** — Tools for filming day:
+- **⏱️ Challenge timer** — a giant stopwatch (with 🏁 laps) or countdown (10 sec to 5 min) with beeps at the end. Tap **Full screen** to show it big on camera.
+- **🎲 Who goes first?** — type the names, then pick a random order or make 2 teams.
+- **🏆 Sibling scoreboard** — add who won each challenge and see the all-time leaderboard (shared with the family).
+
+**🗓️ Calendar** (in the Planner) — switch between **📋 Board** and **🗓️ Calendar** to see every film day and post day on a month calendar.
+
+**🎥 Shot list** (in each planner card) — the scenes to film, in order. Use the starter shots or add your own, move them with ▲ ▼, and tick them off as you film.
+
+**🤪 Idea Mashup** (on the Spin tab) — smoosh two ideas together or add a crazy twist, then send it to the Planner.
+
+**📱 Home screen app** — In Safari tap Share ⬆️ → **Add to Home Screen** to get the planner as an app with its own icon.
+
 **🎉 Fun Extras** — A spinning punishment wheel, a title helper (*Who + What + Hook*), and a random intro-line picker.
 
 **📦 Share & Backup** (in ⚙️ Settings) — Export everything to a file as a backup, or import a file from a sibling.
