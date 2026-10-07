@@ -318,32 +318,6 @@
 
   <!-- ===================== SETTINGS ===================== -->
   <section class="page" id="page-settings">
-    <div class="panel center" id="familyPanel">
-      <h2>👨‍👩‍👧 Family Sync</h2>
-      <p>Type your secret <b>family code</b> so all three of you share ONE planner. Everyone must use the exact same code!</p>
-      <div id="familyJoin">
-        <div class="row">
-          <input id="familyCode" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Secret family code (6+ letters)" style="max-width:320px">
-          <button class="btn small ghost" id="familyPeekBtn" type="button">🙈 Hide</button>
-          <button class="btn green" id="familyJoinBtn">🔗 Connect</button>
-        </div>
-        <p><small>🤫 Don't post your code anywhere public. Anyone who knows it can change your planner.</small></p>
-      </div>
-      <div id="familyConnected" hidden>
-        <p id="familyStatus" style="font-weight:bold"></p>
-        <button class="btn small ghost" id="familyLeaveBtn">Disconnect this device</button>
-      </div>
-    </div>
-    <div class="panel center">
-      <h2>📦 Share &amp; Backup</h2>
-      <p>Save everything to a file to send to your siblings (or keep as a backup). They can load it into their copy.</p>
-      <div class="row">
-        <button class="btn green" id="exportBtn">⬇️ Export my planner</button>
-        <button class="btn purple" id="importBtn">⬆️ Import a planner file</button>
-        <input type="file" id="importFile" accept=".json,application/json" hidden>
-      </div>
-      <p><small>Importing <b>adds</b> the new ideas and cards to yours. Nothing you have gets erased; if the same card is in both, the imported one wins.</small></p>
-    </div>
     <div class="panel">
       <h2 class="center" style="margin-top:0">⚙️ Settings</h2>
       <div class="setting" style="flex-wrap:wrap">
@@ -388,6 +362,33 @@
         </label>
       </div>
     </div>
+    <div class="panel center" id="familyPanel">
+      <h2>👨‍👩‍👧 Family Sync</h2>
+      <p>Type your secret <b>family code</b> so all three of you share ONE planner. Everyone must use the exact same code!</p>
+      <div id="familyJoin">
+        <div class="row">
+          <input id="familyCode" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Secret family code (6+ letters)" style="max-width:320px">
+          <button class="btn small ghost" id="familyPeekBtn" type="button">🙈 Hide</button>
+          <button class="btn green" id="familyJoinBtn">🔗 Connect</button>
+        </div>
+        <p><small>🤫 Don't post your code anywhere public. Anyone who knows it can change your planner.</small></p>
+      </div>
+      <div id="familyConnected" hidden>
+        <p id="familyStatus" style="font-weight:bold"></p>
+        <button class="btn small ghost" id="familyLeaveBtn">Disconnect this device</button>
+      </div>
+    </div>
+    <div class="panel center">
+      <h2>📦 Share &amp; Backup</h2>
+      <p>Save everything to a file to send to your siblings (or keep as a backup). They can load it into their copy.</p>
+      <div class="row">
+        <button class="btn green" id="exportBtn">⬇️ Export my planner</button>
+        <button class="btn purple" id="importBtn">⬆️ Import a planner file</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </div>
+      <p><small>Importing <b>adds</b> the new ideas and cards to yours. Nothing you have gets erased; if the same card is in both, the imported one wins.</small></p>
+    </div>
+
   </section>
 
   <!-- ===================== EXTRAS ===================== -->
