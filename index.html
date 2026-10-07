@@ -299,7 +299,7 @@
     <div class="panel">
       <h2 class="center" style="margin-top:0">💬 Family Chat</h2>
       <div id="chatOff" class="empty">
-        Connect with your family code first (🎉 Fun Extras → 👨‍👩‍👧 Family Sync), then you can chat here!
+        Connect with your family code first (⚙️ Settings → 👨‍👩‍👧 Family Sync), then you can chat here!
       </div>
       <div id="chatOn" hidden>
         <div class="row" style="justify-content:flex-start;margin-bottom:10px">
@@ -318,6 +318,22 @@
 
   <!-- ===================== SETTINGS ===================== -->
   <section class="page" id="page-settings">
+    <div class="panel center" id="familyPanel">
+      <h2>👨‍👩‍👧 Family Sync</h2>
+      <p>Type your secret <b>family code</b> so all three of you share ONE planner. Everyone must use the exact same code!</p>
+      <div id="familyJoin">
+        <div class="row">
+          <input id="familyCode" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Secret family code (6+ letters)" style="max-width:320px">
+          <button class="btn small ghost" id="familyPeekBtn" type="button">🙈 Hide</button>
+          <button class="btn green" id="familyJoinBtn">🔗 Connect</button>
+        </div>
+        <p><small>🤫 Don't post your code anywhere public. Anyone who knows it can change your planner.</small></p>
+      </div>
+      <div id="familyConnected" hidden>
+        <p id="familyStatus" style="font-weight:bold"></p>
+        <button class="btn small ghost" id="familyLeaveBtn">Disconnect this device</button>
+      </div>
+    </div>
     <div class="panel">
       <h2 class="center" style="margin-top:0">⚙️ Settings</h2>
       <div class="setting" style="flex-wrap:wrap">
@@ -376,22 +392,6 @@
       <p>Formula: <b>[Who] + [What challenge] + [Curiosity hook]</b></p>
       <div id="titleOut">Press the button!</div>
       <button class="btn big purple" id="titleBtn">✨ Make a title</button>
-    </div>
-    <div class="panel center" id="familyPanel">
-      <h2>👨‍👩‍👧 Family Sync</h2>
-      <p>Type your secret <b>family code</b> so all three of you share ONE planner. Everyone must use the exact same code!</p>
-      <div id="familyJoin">
-        <div class="row">
-          <input id="familyCode" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Secret family code (6+ letters)" style="max-width:320px">
-          <button class="btn small ghost" id="familyPeekBtn" type="button">🙈 Hide</button>
-          <button class="btn green" id="familyJoinBtn">🔗 Connect</button>
-        </div>
-        <p><small>🤫 Don't post your code anywhere public. Anyone who knows it can change your planner.</small></p>
-      </div>
-      <div id="familyConnected" hidden>
-        <p id="familyStatus" style="font-weight:bold"></p>
-        <button class="btn small ghost" id="familyLeaveBtn">Disconnect this device</button>
-      </div>
     </div>
     <div class="panel center">
       <h2>📦 Share &amp; Backup</h2>
@@ -461,7 +461,7 @@
   <div id="epComments">
     <h3 style="margin-bottom:6px">💬 Family comments</h3>
     <div id="commentList"></div>
-    <div id="commentOff" class="empty">Connect with your family code (🎉 Fun Extras) to comment!</div>
+    <div id="commentOff" class="empty">Connect with your family code (⚙️ Settings) to comment!</div>
     <form id="commentForm">
       <input id="commentName" maxlength="30" placeholder="Your name" style="max-width:200px;margin-bottom:6px">
       <div class="row" style="flex-wrap:nowrap">
@@ -1204,7 +1204,7 @@ $("familyLeaveBtn").addEventListener("click", e => twoTapDelete(e.currentTarget,
 
 // Tapping the status line jumps to the Family Sync box
 $("syncPill").addEventListener("click", () => {
-  document.querySelector("[data-page=extras]").click();
+  document.querySelector("[data-page=settings]").click();
   $("familyPanel").scrollIntoView({ behavior: "smooth" });
 });
 
@@ -1684,7 +1684,7 @@ function voteButtons(idea, style = "") {
 
 // Tap 👍 (value 1) or 👎 (value -1). Tapping the one you already picked takes your vote back.
 async function castVote(idea, value) {
-  if (!familyCode) { showToast("🔗 Connect with your family code (Fun Extras) to vote!"); return; }
+  if (!familyCode) { showToast("🔗 Connect with your family code (⚙️ Settings) to vote!"); return; }
   if (!myName()) { showToast("👤 Set your name in ⚙️ Settings first, so we know who voted!"); return; }
   const v = votesFor(idea.id);
   const current = v.up.includes(myName()) ? 1 : v.down.includes(myName()) ? -1 : 0;
