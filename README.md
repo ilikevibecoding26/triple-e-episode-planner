@@ -25,6 +25,8 @@
 
 **👨‍👩‍👧 Family Sync** (in Fun Extras) — Type your secret family code and press Connect. Everyone who uses the same code shares ONE planner, and changes show up on everyone's screen within a few seconds. This part needs the internet; if you're offline, changes wait and sync later. Keep the code secret!
 
+**💬 Card comments** (in the Planner) — Tap 💬 on any card to talk about just that episode. The number shows how many comments it has. Separate from the main chat!
+
 **💬 Chat** — Once you're connected with your family code, talk about what you're planning! Type your name once, then chat. A pink number on the Chat tab means new messages.
 
 The stats line at the top shows how many ideas are banked and where your episodes are.

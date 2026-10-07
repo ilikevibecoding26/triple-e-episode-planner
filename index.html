@@ -123,6 +123,10 @@
   .msg { max-width: 80%; margin: 6px 0; padding: 8px 12px; border: 2px solid var(--ink); border-radius: 16px; background: white; overflow-wrap: anywhere; }
   .msg.mine { margin-left: auto; background: #fce7f3; }
   .msg .who { font-size: .75rem; font-weight: bold; color: var(--purple); }
+  #epComments { border-top: 3px dashed var(--ink); margin-top: 8px; }
+  #commentList { max-height: 220px; overflow-y: auto; margin-bottom: 8px; }
+  #commentList .msg { max-width: 100%; }
+  #commentList:empty::before { content: "No comments yet — what do you think of this idea? 🤔"; display: block; opacity: .6; text-align: center; padding: 8px; }
   .badge { background: var(--pink); color: white; border-radius: 999px; padding: 0 7px; font-size: .8rem; }
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 120px); z-index: 10;
@@ -230,7 +234,7 @@
   <!-- ===================== PLANNER ===================== -->
   <section class="page" id="page-planner">
     <p class="center"><button class="btn purple" id="newEpBtn">➕ New episode</button>
-    <br><small>Tip: drag cards between columns, or use the ◀ ▶ buttons. Click a title to edit notes!</small></p>
+    <br><small>Tip: drag cards between columns, or use the ◀ ▶ buttons. Click a title or ✏️ to edit notes, and 💬 to comment!</small></p>
     <div id="board"></div>
   </section>
 
@@ -323,6 +327,19 @@
       <button class="btn orange" type="button" id="epDelete">🗑️ Delete</button>
     </p>
   </form>
+  <!-- Comments live OUTSIDE the form above, so sending a comment doesn't close the pop-up -->
+  <div id="epComments">
+    <h3 style="margin-bottom:6px">💬 Family comments</h3>
+    <div id="commentList"></div>
+    <div id="commentOff" class="empty">Connect with your family code (🎉 Fun Extras) to comment!</div>
+    <form id="commentForm">
+      <input id="commentName" maxlength="30" placeholder="Your name" style="max-width:200px;margin-bottom:6px">
+      <div class="row" style="flex-wrap:nowrap">
+        <input id="commentText" maxlength="500" autocomplete="off" placeholder="Ooh, what if we...">
+        <button class="btn small green" type="submit">Post</button>
+      </div>
+    </form>
+  </div>
 </dialog>
 
 <script>
@@ -715,7 +732,8 @@ function renderBoard() {
         el("p", {}, ep.desc),
         el("div", { class: "moves" },
           el("button", { class: "btn small ghost", onclick: () => shift(ep, -1) }, "◀"),
-          el("button", { class: "btn small ghost", onclick: () => openEpisode(ep) }, "✏️ notes"),
+          el("button", { class: "btn small ghost", onclick: () => openEpisode(ep) }, "✏️"),
+          el("button", { class: "btn small ghost", title: "Comments", onclick: () => openEpisode(ep, true) }, "💬" + commentCountLabel(ep.id)),
           el("button", { class: "btn small green", onclick: () => shift(ep, +1) }, "▶")
         ));
       card.addEventListener("dragstart", e => e.dataTransfer.setData("text/plain", ep.id));
@@ -729,7 +747,8 @@ function renderBoard() {
 let editingId = null; // null means "creating a new one"
 STAGES.forEach(s => $("epStatus").append(el("option", {}, s)));
 
-function openEpisode(ep) {
+// jumpToComments = true opens the pop-up scrolled down to the comments
+function openEpisode(ep, jumpToComments = false) {
   editingId = ep ? ep.id : null;
   $("epDialogTitle").textContent = ep ? "✏️ Edit episode" : "➕ New episode";
   $("epTitle").value = ep ? ep.title : "";
@@ -741,7 +760,10 @@ function openEpisode(ep) {
   $("epHook").value = ep ? ep.hook : "";
   $("epPunish").value = ep ? ep.punish : "";
   $("epDelete").hidden = !ep;
+  renderComments();
   $("epDialog").showModal();
+  if (jumpToComments) { $("epComments").scrollIntoView(); $("commentText").focus(); }
+  else $("epDialog").scrollTop = 0;
 }
 $("newEpBtn").addEventListener("click", () => openEpisode(null));
 $("epCancel").addEventListener("click", () => $("epDialog").close());
@@ -995,6 +1017,7 @@ $("familyJoinBtn").addEventListener("click", async () => {
     const isNew = await joinFamily(code);
     $("familyCode").value = "";
     resetChat(); pullMessages();
+    resetComments(); pullComments();
     showToast(isNew ? "🎉 New family planner made! Give your siblings the same code."
                     : "🔗 Connected! You're sharing the family planner.");
   } catch (e) {
@@ -1008,7 +1031,7 @@ $("familyLeaveBtn").addEventListener("click", e => twoTapDelete(e.currentTarget,
   // Stops sharing on THIS device only. Your local copy stays; the family planner is untouched.
   familyCode = null; synced = {}; lastPull = "1970-01-01T00:00:00Z";
   try { localStorage.removeItem("tes_family_code"); } catch (err) {}
-  saveSyncState(); renderSync(); resetChat();
+  saveSyncState(); renderSync(); resetChat(); resetComments();
   showToast("📴 Disconnected. This device keeps its own copy now.");
 }));
 
@@ -1090,9 +1113,72 @@ document.querySelector("[data-page=chat]").addEventListener("click", () => {
   $("chatList").scrollTop = $("chatList").scrollHeight;
 });
 
+/* ---------- 4h. CARD COMMENTS ----------
+   Like the chat, but every comment belongs to ONE planner card (its item_id).
+   We keep all comments in an object: { cardId: [comment, comment, ...] } */
+let commentsByCard = {};
+let lastCommentId = 0;
+
+function resetComments() { commentsByCard = {}; lastCommentId = 0; renderBoard(); renderComments(); }
+
+// "✏️ notes 💬2" — shows how many comments a card has
+function commentCountLabel(cardId) {
+  const n = (commentsByCard[cardId] || []).length;
+  return n ? " " + n : "";
+}
+
+// Draw the comments for the card that's open in the pop-up
+function renderComments() {
+  $("epComments").hidden = !editingId; // brand-new cards can't have comments yet
+  $("commentOff").hidden = !!familyCode;
+  $("commentForm").hidden = !familyCode;
+  $("commentList").hidden = !familyCode;
+  $("commentName").value = $("commentName").value || chatName;
+  const list = $("commentList");
+  list.replaceChildren(...(commentsByCard[editingId] || []).map(c => {
+    const time = new Date(c.created_at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+    return el("div", { class: "msg" + (c.name === chatName ? " mine" : "") },
+      el("div", { class: "who" }, c.name + " · " + time),
+      el("div", {}, c.body));
+  }));
+  list.scrollTop = list.scrollHeight;
+}
+
+async function pullComments() {
+  if (!familyCode) return;
+  try {
+    const rows = await callDb("get_comments", { code: familyCode, after_id: lastCommentId });
+    const fresh = rows.filter(c => c.id > lastCommentId); // skip any we already have
+    if (!fresh.length) return;
+    fresh.forEach(c => {
+      (commentsByCard[c.item_id] = commentsByCard[c.item_id] || []).push(c);
+      lastCommentId = c.id;
+    });
+    renderBoard(); // update the 💬 counts
+    if ($("epDialog").open) renderComments();
+  } catch (e) { /* offline: try again next tick */ }
+}
+
+$("commentForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const body = $("commentText").value.trim();
+  const name = $("commentName").value.trim();
+  if (!body) return;
+  if (!name) { showToast("✏️ Type your name first!"); $("commentName").focus(); return; }
+  // Share the name with the chat so you only type it once
+  chatName = name; save("tes_chat_name", chatName); $("chatName").value = chatName;
+  try {
+    await callDb("add_comment", { code: familyCode, item_id: editingId, name, body });
+    $("commentText").value = "";
+    pullComments();
+  } catch (err) {
+    showToast("😕 Comment didn't post. Check your internet and try again.");
+  }
+});
+
 // Check for siblings' changes (and new messages) every 5 seconds, and right away when you come back
-setInterval(() => { pushChanges(); pullChanges(); pullMessages(); }, 5000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { pullChanges(); pullMessages(); } });
+setInterval(() => { pushChanges(); pullChanges(); pullMessages(); pullComments(); }, 5000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { pullChanges(); pullMessages(); pullComments(); } });
 
 /* ---------- Draw everything ---------- */
 function renderAll() { renderStats(); renderBank(); renderShorts(); renderBoard(); }
@@ -1100,6 +1186,7 @@ renderAll();
 renderSync();
 pullChanges();
 pullMessages();
+pullComments();
 </script>
 </body>
 </html>
