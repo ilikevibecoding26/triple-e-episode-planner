@@ -114,6 +114,12 @@
   #punishBox { font-size: 1.5rem; font-weight: bold; min-height: 90px; display: flex; align-items: center; justify-content: center; border: 4px dashed var(--pink); border-radius: 20px; padding: 14px; margin: 14px 0; background: #fdf2f8; }
   #titleOut { font-size: 1.6rem; font-weight: bold; margin: 12px 0; }
   .empty { text-align: center; opacity: .6; padding: 10px; }
+  /* ---- Chat ---- */
+  #chatList { height: 50vh; min-height: 260px; overflow-y: auto; border: 3px solid var(--ink); border-radius: 16px; padding: 10px; background: #f5f3ff; }
+  .msg { max-width: 80%; margin: 6px 0; padding: 8px 12px; border: 2px solid var(--ink); border-radius: 16px; background: white; overflow-wrap: anywhere; }
+  .msg.mine { margin-left: auto; background: #fce7f3; }
+  .msg .who { font-size: .75rem; font-weight: bold; color: var(--purple); }
+  .badge { background: var(--pink); color: white; border-radius: 999px; padding: 0 7px; font-size: .8rem; }
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 120px); z-index: 10;
     background: var(--gaming); color: white; font-weight: bold; padding: 14px 22px;
@@ -137,6 +143,7 @@
   <button class="tab" data-page="bank">💡 Idea Bank</button>
   <button class="tab" data-page="shorts">⚡ Shorts</button>
   <button class="tab" data-page="planner">📋 Planner</button>
+  <button class="tab" data-page="chat">💬 Chat <span id="chatBadge" class="badge" hidden></span></button>
   <button class="tab" data-page="extras">🎉 Fun Extras</button>
 </nav>
 
@@ -221,6 +228,28 @@
     <p class="center"><button class="btn purple" id="newEpBtn">➕ New episode</button>
     <br><small>Tip: drag cards between columns, or use the ◀ ▶ buttons. Click a title to edit notes!</small></p>
     <div id="board"></div>
+  </section>
+
+  <!-- ===================== CHAT ===================== -->
+  <section class="page" id="page-chat">
+    <div class="panel">
+      <h2 class="center" style="margin-top:0">💬 Family Chat</h2>
+      <div id="chatOff" class="empty">
+        Connect with your family code first (🎉 Fun Extras → 👨‍👩‍👧 Family Sync), then you can chat here!
+      </div>
+      <div id="chatOn" hidden>
+        <div class="row" style="justify-content:flex-start;margin-bottom:10px">
+          <label for="chatName" style="margin:0">Your name:</label>
+          <input id="chatName" maxlength="30" placeholder="e.g. Big Sis" style="max-width:200px">
+        </div>
+        <div id="chatList"></div>
+        <form id="chatForm" class="row" style="margin-top:10px;flex-wrap:nowrap">
+          <input id="chatText" maxlength="500" autocomplete="off" placeholder="What are we filming next? 🎬">
+          <button class="btn green" type="submit">Send</button>
+        </form>
+        <p class="center"><small>Only people with your family code can see this chat. Be kind! 💖</small></p>
+      </div>
+    </div>
   </section>
 
   <!-- ===================== EXTRAS ===================== -->
@@ -943,6 +972,7 @@ function renderSync() {
     : online ? "🟢 Sharing with your family" : "🟠 Can't reach the internet — changes will sync later";
   $("syncPill").textContent = text;
   $("familyStatus").textContent = text;
+  if (typeof renderChatState === "function") renderChatState();
 }
 
 // Show or hide the code as you type ("password" type shows dots instead of letters)
@@ -960,6 +990,7 @@ $("familyJoinBtn").addEventListener("click", async () => {
   try {
     const isNew = await joinFamily(code);
     $("familyCode").value = "";
+    resetChat(); pullMessages();
     showToast(isNew ? "🎉 New family planner made! Give your siblings the same code."
                     : "🔗 Connected! You're sharing the family planner.");
   } catch (e) {
@@ -973,7 +1004,7 @@ $("familyLeaveBtn").addEventListener("click", e => twoTapDelete(e.currentTarget,
   // Stops sharing on THIS device only. Your local copy stays; the family planner is untouched.
   familyCode = null; synced = {}; lastPull = "1970-01-01T00:00:00Z";
   try { localStorage.removeItem("tes_family_code"); } catch (err) {}
-  saveSyncState(); renderSync();
+  saveSyncState(); renderSync(); resetChat();
   showToast("📴 Disconnected. This device keeps its own copy now.");
 }));
 
@@ -983,15 +1014,88 @@ $("syncPill").addEventListener("click", () => {
   $("familyPanel").scrollIntoView({ behavior: "smooth" });
 });
 
-// Check for siblings' changes every 5 seconds, and right away when you come back to the tab
-setInterval(() => { pushChanges(); pullChanges(); }, 5000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) pullChanges(); });
+/* ---------- 4g. FAMILY CHAT ----------
+   Messages are saved in the database under your family code.
+   Every message has a number (id) that goes up by 1 each time, so we just ask
+   "any messages with a number bigger than the last one we saw?" */
+let lastMsgId = 0;
+let unread = 0;
+let chatName = load("tes_chat_name", "");
+$("chatName").value = chatName;
+$("chatName").addEventListener("change", () => { chatName = $("chatName").value.trim(); save("tes_chat_name", chatName); });
+
+function chatIsOpen() { return $("page-chat").classList.contains("active") && !document.hidden; }
+
+function resetChat() {
+  lastMsgId = 0; unread = 0;
+  $("chatList").replaceChildren();
+  renderChatState();
+}
+
+function renderChatState() {
+  $("chatOff").hidden = !!familyCode;
+  $("chatOn").hidden = !familyCode;
+  $("chatBadge").hidden = unread === 0;
+  $("chatBadge").textContent = unread;
+}
+
+function addMessageToList(m) {
+  const time = new Date(m.created_at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+  $("chatList").append(el("div", { class: "msg" + (m.name === chatName ? " mine" : "") },
+    el("div", { class: "who" }, m.name + " · " + time),
+    el("div", {}, m.body)));
+}
+
+async function pullMessages() {
+  if (!familyCode) return;
+  try {
+    const firstLoad = lastMsgId === 0;
+    const rows = await callDb("get_messages", { code: familyCode, after_id: lastMsgId });
+    if (!rows.length) return;
+    const list = $("chatList");
+    // Only auto-scroll if you were already at the bottom (so we don't yank you while reading old messages)
+    const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+    // Skip anything we've already shown (two checks can overlap, e.g. right after you hit Send)
+    const fresh = rows.filter(m => m.id > lastMsgId);
+    fresh.forEach(m => { addMessageToList(m); lastMsgId = m.id; });
+    if (atBottom || firstLoad) list.scrollTop = list.scrollHeight;
+    if (!firstLoad && !chatIsOpen()) unread += fresh.filter(m => m.name !== chatName).length;
+    renderChatState();
+  } catch (e) { /* offline: try again next tick */ }
+}
+
+$("chatForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const body = $("chatText").value.trim();
+  if (!body) return;
+  chatName = $("chatName").value.trim(); save("tes_chat_name", chatName);
+  if (!chatName) { showToast("✏️ Type your name first so everyone knows who's talking!"); $("chatName").focus(); return; }
+  try {
+    await callDb("send_message", { code: familyCode, name: chatName, body });
+    $("chatText").value = "";
+    $("chatList").scrollTop = $("chatList").scrollHeight;
+    pullMessages();
+  } catch (err) {
+    showToast("😕 Message didn't send. Check your internet and try again.");
+  }
+});
+
+// Opening the Chat tab clears the unread badge
+document.querySelector("[data-page=chat]").addEventListener("click", () => {
+  unread = 0; renderChatState();
+  $("chatList").scrollTop = $("chatList").scrollHeight;
+});
+
+// Check for siblings' changes (and new messages) every 5 seconds, and right away when you come back
+setInterval(() => { pushChanges(); pullChanges(); pullMessages(); }, 5000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { pullChanges(); pullMessages(); } });
 
 /* ---------- Draw everything ---------- */
 function renderAll() { renderStats(); renderBank(); renderShorts(); renderBoard(); }
 renderAll();
 renderSync();
 pullChanges();
+pullMessages();
 </script>
 </body>
 </html>
