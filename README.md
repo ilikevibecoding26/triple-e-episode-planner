@@ -19,7 +19,7 @@
 
 **💡 Idea Bank** — See every idea (40+ ready to go!). Add your own with the form, filter by channel, mark ideas done, or 🗑️ delete them. Your own ideas get a ⭐.
 
-**📋 Planner** — Five columns: **Idea → Planned → Filming → Editing → Posted**. Move cards with ◀ ▶, or drag them. Click a title (or ✏️ notes) to add title options, a thumbnail idea, a spoken hook, and a punishment.
+**📋 Planner** — Five columns: **Idea → Planned → Filming → Editing → Posted**. Move cards with ◀ ▶, or drag them. Click a title (or ✏️) to add title options, a thumbnail idea, a spoken hook, and a punishment. Tap 🗑️ twice to delete a card.
 
 **🎉 Fun Extras** — Punishment picker, a title helper (*Who + What + Hook*), and a random intro-line picker.
 

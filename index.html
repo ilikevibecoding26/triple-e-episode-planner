@@ -234,7 +234,7 @@
   <!-- ===================== PLANNER ===================== -->
   <section class="page" id="page-planner">
     <p class="center"><button class="btn purple" id="newEpBtn">➕ New episode</button>
-    <br><small>Tip: drag cards between columns, or use the ◀ ▶ buttons. Click a title or ✏️ to edit notes, and 💬 to comment!</small></p>
+    <br><small>Tip: drag cards between columns, or use the ◀ ▶ buttons. Click a title or ✏️ to edit notes, 💬 to comment, and 🗑️ (tap twice) to delete!</small></p>
     <div id="board"></div>
   </section>
 
@@ -727,6 +727,9 @@ function renderBoard() {
 
     mine.forEach(ep => {
       const card = el("div", { class: "ep accent-" + ep.channel, draggable: "true" },
+        // little trash can in the top-right corner (tap twice to delete)
+        el("button", { class: "btn small orange", style: "float:right", title: "Delete card",
+          onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => deleteEpisode(ep.id)) }, "🗑️"),
         chip(ep.channel), ep.isShort ? el("span", { class: "chip Short" }, "⚡ Short") : "",
         el("h4", { onclick: () => openEpisode(ep) }, ep.title),
         el("p", {}, ep.desc),
@@ -768,9 +771,21 @@ function openEpisode(ep, jumpToComments = false) {
 $("newEpBtn").addEventListener("click", () => openEpisode(null));
 $("epCancel").addEventListener("click", () => $("epDialog").close());
 $("epDelete").addEventListener("click", e => twoTapDelete(e.currentTarget, "🗑️ Delete", () => {
-  episodes = episodes.filter(x => x.id !== editingId);
-  $("epDialog").close(); saveAll();
+  $("epDialog").close();
+  deleteEpisode(editingId);
 }));
+
+// Remove a card from the planner (and its comments, if you're sharing with family)
+function deleteEpisode(id) {
+  const ep = episodes.find(x => x.id === id);
+  episodes = episodes.filter(x => x.id !== id);
+  saveAll(); // this also tells the family database the card is gone
+  if (familyCode) {
+    delete commentsByCard[id];
+    callDb("delete_item_comments", { code: familyCode, item_id: id }).catch(() => {});
+  }
+  showToast("🗑️ Deleted \"" + (ep ? ep.title : "card") + "\"");
+}
 $("epForm").addEventListener("submit", () => {
   const data = {
     title: $("epTitle").value.trim(), channel: $("epChannel").value, status: $("epStatus").value, desc: $("epDesc").value.trim(),
