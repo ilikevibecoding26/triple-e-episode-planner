@@ -23,7 +23,7 @@
 
 **📅 Dates, 🙋 jobs & ✅ checklists** (in each planner card) — Pick a *Film on* and *Post on* date, add who's doing what (like "Big Sis: Editing"), and tick off the filming checklist. The **Coming up** box at the top of the Planner shows the next 2 weeks (late stuff turns red), and **Show cards for** filters the board to one person.
 
-**👍 Voting** (Idea Bank & Shorts) — Vote for the ideas you like best; the most-voted ideas float to the top. Needs your family code and your name (⚙️ Settings).
+**👍 Voting** (Idea Bank, Shorts & Planner) — Vote for the ideas and episodes you like best; the most-voted ones float to the top (in the Planner, to the top of their column). Needs your family code and your name (⚙️ Settings).
 
 **🎉 Fun Extras** — Punishment picker, a title helper (*Who + What + Hook*), and a random intro-line picker.
 

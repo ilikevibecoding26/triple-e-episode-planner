@@ -845,7 +845,7 @@ function renderBoard() {
   renderComingUp();
   $("board").replaceChildren(...STAGES.map(stage => {
     const col = el("div", { class: "col", "data-stage": stage }, el("h3", {}, stage));
-    const mine = visibleEpisodes().filter(e => e.status === stage);
+    const mine = byVotes(visibleEpisodes().filter(e => e.status === stage)); // most votes at the top
     if (!mine.length) col.append(el("div", { class: "empty" }, "Nothing here yet"));
 
     /* DRAG & DROP, in plain words:
@@ -865,6 +865,7 @@ function renderBoard() {
         // little trash can in the top-right corner (tap twice to delete)
         el("button", { class: "btn small orange", style: "float:right", title: "Delete card",
           onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => deleteEpisode(ep.id)) }, "🗑️"),
+        voteButton(ep, "float:right;margin-right:4px"),
         chip(ep.channel), ep.isShort ? el("span", { class: "chip Short" }, "⚡ Short") : "",
         el("h4", { onclick: () => openEpisode(ep) }, ep.title),
         el("p", {}, ep.desc),
@@ -1196,7 +1197,7 @@ $("familyLeaveBtn").addEventListener("click", e => twoTapDelete(e.currentTarget,
   familyCode = null; synced = {}; lastPull = "1970-01-01T00:00:00Z";
   try { localStorage.removeItem("tes_family_code"); } catch (err) {}
   saveSyncState(); renderSync(); resetChat(); resetComments();
-  votesByItem = {}; renderBank(); renderShorts();
+  votesByItem = {}; renderBank(); renderShorts(); renderBoard();
   showToast("📴 Disconnected. This device keeps its own copy now.");
 }));
 
@@ -1644,7 +1645,7 @@ async function pullVotes() {
     rows.forEach(r => (next[r.item_id] = next[r.item_id] || []).push(r.voter));
     if (JSON.stringify(next) === JSON.stringify(votesByItem)) return; // nothing changed
     votesByItem = next;
-    renderBank(); renderShorts();
+    renderBank(); renderShorts(); renderBoard();
   } catch (e) { /* offline: try later */ }
 }
 
@@ -1654,11 +1655,12 @@ function byVotes(list) {
     ((votesByItem[b.item.id] || []).length - (votesByItem[a.item.id] || []).length) || a.i - b.i).map(x => x.item);
 }
 
-function voteButton(idea) {
+function voteButton(idea, style = "") {
   const voters = votesByItem[idea.id] || [];
   const iVoted = voters.includes(myName());
   return el("button", {
     class: "btn small " + (iVoted ? "" : "ghost"), // pink when YOU voted for it
+    style,
     title: voters.length ? "Votes: " + voters.join(", ") : "Vote for this idea!",
     onclick: () => toggleVote(idea)
   }, ico("👍", "Vote") + (voters.length ? " " + voters.length : ""));
@@ -1671,7 +1673,7 @@ async function toggleVote(idea) {
   const up = !voters.includes(myName());
   // Update the screen right away, then tell the database
   votesByItem[idea.id] = up ? [...voters, myName()] : voters.filter(v => v !== myName());
-  renderBank(); renderShorts();
+  renderBank(); renderShorts(); renderBoard();
   try { await callDb("set_vote", { code: familyCode, item_id: idea.id, voter: myName(), up }); }
   catch (e) { showToast("😕 Vote didn't save. Check your internet!"); }
   pullVotes();
