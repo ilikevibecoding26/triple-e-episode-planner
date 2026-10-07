@@ -29,7 +29,10 @@
 
 **💬 Chat** — Once you're connected with your family code, talk about what you're planning! Type your name once, then chat. A pink number on the Chat tab means new messages.
 
-**⚙️ Settings** — Just for you, on your device. Flip the **Show emojis** switch off if all the emojis get annoying (it's on by default). Nothing you saved changes; emojis are just hidden.
+**⚙️ Settings**
+- **📺 Channel name** — Change the name at the top of the app. If you're connected with your family code, everyone sees the new name.
+- **🌙 Dark mode** — Darker colors for nighttime (just on your device).
+- **😀 Show emojis** — Flip it off if all the emojis get annoying (just on your device, on by default). Nothing you saved changes; emojis are just hidden.
 
 The stats line at the top shows how many ideas are banked and where your episodes are.
 

@@ -17,7 +17,25 @@
     --card: #ffffff;
     --pink: #ec4899;
     --purple: #7c3aed;
+    --card-alt: #fffdf2;     /* planner cards */
+    --pink-soft: #fce7f3;    /* your chat bubbles, punishment box */
+    --purple-soft: #f5f3ff;  /* chat background */
+    --switch-off: #cbd5e1;
   }
+  /* 🌙 DARK MODE: same names, darker colors. Adding class="dark" to <html> swaps them all at once! */
+  html.dark {
+    color-scheme: dark;      /* makes scrollbars and dropdowns dark too */
+    --ink: #ede9fe;          /* light text + outlines */
+    --bg: #15112b;
+    --card: #231d45;
+    --card-alt: #2a2352;
+    --gaming-soft: #143a24;
+    --challenge-soft: #42260f;
+    --pink-soft: #4a1d3b;
+    --purple-soft: #1b1636;
+    --switch-off: #4b4870;
+  }
+  html.dark header { border-bottom-color: #0b0818; }
   * { box-sizing: border-box; }
   body {
     margin: 0; color: var(--ink); background: var(--bg);
@@ -35,7 +53,7 @@
   nav { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding: 12px; }
   nav button.tab {
     font: inherit; font-weight: bold; padding: 10px 18px; border-radius: 999px;
-    border: 3px solid var(--ink); background: white; color: var(--ink); cursor: pointer;
+    border: 3px solid var(--ink); background: var(--card); color: var(--ink); cursor: pointer;
   }
   nav button.tab.active { background: var(--purple); color: white; }
 
@@ -54,10 +72,10 @@
   .btn.orange { background: var(--challenge); }
   .btn.purple { background: var(--purple); }
   .btn.small { font-size: .85rem; padding: 4px 10px; box-shadow: 0 2px 0 var(--ink); border-radius: 10px; }
-  .btn.ghost { background: white; color: var(--ink); }
+  .btn.ghost { background: var(--card); color: var(--ink); }
 
   input, select, textarea {
-    border: 3px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: white; width: 100%;
+    border: 3px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--card); width: 100%;
   }
   label { display: block; font-weight: bold; margin: 10px 0 4px; }
 
@@ -74,26 +92,26 @@
   .accent-Challenge { border-left: 10px solid var(--challenge); }
 
   /* ---- Spin page ---- */
-  #ideaCard, #shortCard { margin: 18px auto; max-width: 640px; min-height: 160px; border-radius: 24px; padding: 20px; border: 4px solid var(--ink); background: white; }
+  #ideaCard, #shortCard { margin: 18px auto; max-width: 640px; min-height: 160px; border-radius: 24px; padding: 20px; border: 4px solid var(--ink); background: var(--card); }
   #ideaCard.Gaming { background: var(--gaming-soft); }
   #ideaCard.Challenge { background: var(--challenge-soft); }
   #ideaCard h2 { margin: 8px 0; font-size: 1.8rem; }
   @keyframes pop { 0% { transform: scale(.7) rotate(-4deg); } 70% { transform: scale(1.06) rotate(1deg); } 100% { transform: scale(1); } }
   #ideaCard.pop { animation: pop .4s ease; }
-  .picker label { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 8px 14px; border: 3px solid var(--ink); border-radius: 999px; background: white; cursor: pointer; }
+  .picker label { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 8px 14px; border: 3px solid var(--ink); border-radius: 999px; background: var(--card); cursor: pointer; }
   .picker input { width: auto; }
   .picker label.on { background: var(--purple); color: white; }
 
   /* ---- Bank page ---- */
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-  .idea { background: white; border: 3px solid var(--ink); border-radius: 16px; padding: 12px; }
+  .idea { background: var(--card); border: 3px solid var(--ink); border-radius: 16px; padding: 12px; }
   .idea.used { opacity: .55; }
   .idea h3 { margin: 6px 0 4px; font-size: 1.05rem; }
   .idea p { margin: 0 0 8px; font-size: .9rem; }
 
   /* ---- Planner board ---- */
   #board { display: grid; grid-template-columns: repeat(5, minmax(210px, 1fr)); gap: 10px; overflow-x: auto; padding-bottom: 8px; }
-  .col { border: 4px solid var(--ink); border-radius: 18px; padding: 8px; min-height: 220px; background: #fff; }
+  .col { border: 4px solid var(--ink); border-radius: 18px; padding: 8px; min-height: 220px; background: var(--card); }
   .col h3 { margin: 0 0 8px; text-align: center; color: white; border-radius: 10px; padding: 4px; border: 2px solid var(--ink); }
   .col.dragover { outline: 5px dashed var(--pink); }
   .col[data-stage="Idea"] h3 { background: #8b5cf6; }
@@ -101,27 +119,27 @@
   .col[data-stage="Filming"] h3 { background: #ef4444; }
   .col[data-stage="Editing"] h3 { background: #eab308; }
   .col[data-stage="Posted"] h3 { background: #22c55e; }
-  .ep { background: #fffdf2; border: 3px solid var(--ink); border-radius: 12px; padding: 8px; margin-bottom: 8px; cursor: grab; }
+  .ep { background: var(--card-alt); border: 3px solid var(--ink); border-radius: 12px; padding: 8px; margin-bottom: 8px; cursor: grab; }
   .ep h4 { margin: 4px 0; font-size: 1rem; cursor: pointer; }
   .ep p { margin: 0 0 6px; font-size: .82rem; }
   .ep .moves { display: flex; justify-content: space-between; }
 
   /* ---- Pop-up form ---- */
-  dialog { border: 4px solid var(--ink); border-radius: 22px; max-width: 520px; width: 92%; background: white; padding: 18px; }
+  dialog { border: 4px solid var(--ink); border-radius: 22px; max-width: 520px; width: 92%; background: var(--card); padding: 18px; }
   dialog::backdrop { background: rgba(43,33,96,.55); }
 
   /* ---- Extras ---- */
-  #punishBox { font-size: 1.5rem; font-weight: bold; min-height: 90px; display: flex; align-items: center; justify-content: center; border: 4px dashed var(--pink); border-radius: 20px; padding: 14px; margin: 14px 0; background: #fdf2f8; }
+  #punishBox { font-size: 1.5rem; font-weight: bold; min-height: 90px; display: flex; align-items: center; justify-content: center; border: 4px dashed var(--pink); border-radius: 20px; padding: 14px; margin: 14px 0; background: var(--pink-soft); }
   #titleOut { font-size: 1.6rem; font-weight: bold; margin: 12px 0; }
   .empty { text-align: center; opacity: .6; padding: 10px; }
   /* ---- Chat ---- */
-  #chatList { height: 50vh; min-height: 260px; overflow-y: auto; border: 3px solid var(--ink); border-radius: 16px; padding: 10px; background: #f5f3ff; }
+  #chatList { height: 50vh; min-height: 260px; overflow-y: auto; border: 3px solid var(--ink); border-radius: 16px; padding: 10px; background: var(--purple-soft); }
   /* When there are no messages yet, show a friendly hint inside the box
      (":empty" means "has nothing inside it"; it goes away once a message arrives) */
   #chatList:empty { height: auto; min-height: 140px; display: flex; align-items: center; justify-content: center; }
   #chatList:empty::before { content: "No messages yet — be the first to say hi! 👋"; font-size: 1.2rem; font-weight: bold; opacity: .6; text-align: center; }
-  .msg { max-width: 80%; margin: 6px 0; padding: 8px 12px; border: 2px solid var(--ink); border-radius: 16px; background: white; overflow-wrap: anywhere; }
-  .msg.mine { margin-left: auto; background: #fce7f3; }
+  .msg { max-width: 80%; margin: 6px 0; padding: 8px 12px; border: 2px solid var(--ink); border-radius: 16px; background: var(--card); overflow-wrap: anywhere; }
+  .msg.mine { margin-left: auto; background: var(--pink-soft); }
   .msg .who { font-size: .75rem; font-weight: bold; color: var(--purple); }
   #epComments { border-top: 3px dashed var(--ink); margin-top: 8px; }
   #commentList { max-height: 220px; overflow-y: auto; margin-bottom: 8px; }
@@ -135,27 +153,27 @@
   .setting-help { font-size: .85rem; opacity: .75; }
   .switch { position: relative; flex: none; width: 64px; height: 36px; margin: 0; cursor: pointer; }
   .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
-  .slider { position: absolute; inset: 0; background: #cbd5e1; border: 3px solid var(--ink); border-radius: 999px; transition: background .2s; }
-  .slider::before { content: ""; position: absolute; width: 24px; height: 24px; left: 3px; top: 3px; background: white; border: 2px solid var(--ink); border-radius: 50%; transition: transform .2s; box-sizing: border-box; }
+  .slider { position: absolute; inset: 0; background: var(--switch-off); border: 3px solid var(--ink); border-radius: 999px; transition: background .2s; }
+  .slider::before { content: ""; position: absolute; width: 24px; height: 24px; left: 3px; top: 3px; background: var(--card); border: 2px solid var(--ink); border-radius: 50%; transition: transform .2s; box-sizing: border-box; }
   .switch input:checked + .slider { background: var(--gaming); }
   .switch input:checked + .slider::before { transform: translateX(28px); }
   .switch input:focus-visible + .slider { outline: 3px solid var(--purple); outline-offset: 2px; }
   html.no-emoji #chatList:empty::before { content: "No messages yet — be the first to say hi!"; }
   html.no-emoji #commentList:empty::before { content: "No comments yet — what do you think of this idea?"; }
   #toast {
-    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 120px); z-index: 10;
+    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, calc(100% + 40px)); opacity: 0; z-index: 10;
     background: var(--gaming); color: white; font-weight: bold; padding: 14px 22px;
     border: 4px solid var(--ink); border-radius: 18px; box-shadow: 0 5px 0 var(--ink);
-    transition: transform .3s; max-width: 90%; text-align: center; pointer-events: none;
+    transition: transform .3s, opacity .3s; max-width: 90%; text-align: center; pointer-events: none;
   }
-  #toast.show { transform: translate(-50%, 0); }
+  #toast.show { transform: translate(-50%, 0); opacity: 1; }
   @media (max-width: 700px) { header h1 { font-size: 1.5rem; } }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>🎬 Triple E Studios Episode Planner 🎬</h1>
+  <h1>🎬 <span id="channelTitle">Triple E Studios</span> Episode Planner 🎬</h1>
   <div id="stats"></div>
   <div id="syncPill" style="margin-top:4px;font-size:.9rem;cursor:pointer"></div>
 </header>
@@ -279,7 +297,27 @@
   <section class="page" id="page-settings">
     <div class="panel">
       <h2 class="center" style="margin-top:0">⚙️ Settings</h2>
-      <p class="center"><small>These settings are just for <b>you</b>, on this device. They don't change anything for your siblings.</small></p>
+      <div class="setting" style="flex-wrap:wrap">
+        <div style="flex:1 1 220px">
+          <div class="setting-name">📺 Channel name</div>
+          <div class="setting-help">Shows at the top of the app. If you're connected with your family code, everyone sees the new name!</div>
+        </div>
+        <form id="channelForm" class="row" style="flex:1 1 260px;flex-wrap:nowrap">
+          <input id="channelInput" maxlength="40" placeholder="Triple E Studios">
+          <button class="btn small green" type="submit">Save</button>
+        </form>
+      </div>
+      <p class="center" style="margin:18px 0 8px"><small>The settings below are just for <b>you</b>, on this device.</small></p>
+      <div class="setting" style="margin-bottom:10px">
+        <div>
+          <div class="setting-name">🌙 Dark mode</div>
+          <div class="setting-help">Darker colors, easier on your eyes at night.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="darkToggle" role="switch" aria-label="Dark mode">
+          <span class="slider"></span>
+        </label>
+      </div>
       <div class="setting">
         <div>
           <div class="setting-name">😀 Show emojis</div>
@@ -846,7 +884,7 @@ function shuffleReveal(box, list, done) {
   })();
 }
 $("punishBtn").addEventListener("click", () => shuffleReveal($("punishBox"), PUNISHMENTS));
-$("introBtn").addEventListener("click", () => { $("introOut").textContent = pick(INTROS); });
+$("introBtn").addEventListener("click", () => { $("introOut").textContent = pick(INTROS).replace("Triple E Studios", channelName()); });
 $("titleBtn").addEventListener("click", () => {
   $("titleOut").textContent = `${pick(TITLE_WHO)} ${pick(TITLE_WHAT)} ${pick(TITLE_HOOK)}`;
 });
@@ -1018,6 +1056,10 @@ async function pullChanges() {
 async function joinFamily(code) {
   const isNew = await callDb("join_family", { code });
   const rows = await callDb("pull_items", { code, since: "1970-01-01T00:00:00Z" });
+  // Family already has a channel name? Use it. Otherwise share ours (if we set one).
+  const familyName = await callDb("get_channel_name", { code });
+  if (familyName) setChannelName(familyName);
+  else if (load("tes_channel_name", "")) await callDb("set_channel_name", { code, name: channelName() });
   familyCode = code;
   synced = {};
   lastPull = "1970-01-01T00:00:00Z";
@@ -1246,7 +1288,7 @@ $("commentForm").addEventListener("submit", async e => {
 });
 
 // Check for siblings' changes (and new messages) every 5 seconds, and right away when you come back
-setInterval(() => { pushChanges(); pullChanges(); pullMessages(); pullComments(); }, 5000);
+setInterval(() => { pushChanges(); pullChanges(); pullMessages(); pullComments(); pullChannelName(); }, 5000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { pullChanges(); pullMessages(); pullComments(); } });
 
 /* ---------- 4i. SETTINGS: EMOJI ON/OFF ----------
@@ -1287,6 +1329,60 @@ $("emojiToggle").addEventListener("change", () => {
   location.reload(); // simplest way to redraw everything with the new setting
 });
 
+/* ---------- 4j. SETTINGS: DARK MODE ----------
+   Turning on dark mode just adds class="dark" to the page. The CSS at the top
+   has a "html.dark" section that swaps all the colors. */
+let darkMode = load("tes_dark", false); // default: light
+function applyDark() { document.documentElement.classList.toggle("dark", darkMode); }
+applyDark();
+$("darkToggle").checked = darkMode;
+$("darkToggle").addEventListener("change", () => {
+  darkMode = $("darkToggle").checked;
+  save("tes_dark", darkMode);
+  applyDark();
+});
+
+/* ---------- 4k. SETTINGS: CHANNEL NAME ----------
+   Saved on this device, and also in the family database (if connected),
+   so everyone sees the same name. */
+function channelName() { return load("tes_channel_name", "") || "Triple E Studios"; }
+
+function setChannelName(name) {
+  save("tes_channel_name", name.trim());
+  renderChannelName();
+}
+
+function renderChannelName() {
+  $("channelTitle").textContent = channelName();
+  document.title = channelName() + " — Episode Planner";
+  if (document.activeElement !== $("channelInput")) $("channelInput").value = channelName();
+}
+
+$("channelForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const name = $("channelInput").value.trim();
+  if (!name) { showToast("✏️ Type a channel name first!"); return; }
+  setChannelName(name);
+  $("channelInput").blur();
+  if (familyCode) {
+    try { await callDb("set_channel_name", { code: familyCode, name }); showToast("📺 Channel name saved for the whole family!"); }
+    catch (err) { showToast("😕 Saved here, but couldn't reach the family. Try again later."); }
+  } else {
+    showToast("📺 Channel name saved!");
+  }
+});
+
+// Check whether a sibling changed the channel name
+async function pullChannelName() {
+  if (!familyCode) return;
+  try {
+    const name = await callDb("get_channel_name", { code: familyCode });
+    if (name && name !== load("tes_channel_name", "")) setChannelName(name);
+  } catch (e) { /* offline: try later */ }
+}
+
+renderChannelName();
+
 /* ---------- Draw everything ---------- */
 function renderAll() { renderStats(); renderBank(); renderShorts(); renderBoard(); }
 renderAll();
@@ -1306,6 +1402,7 @@ renderSync();
 pullChanges();
 pullMessages();
 pullComments();
+pullChannelName();
 </script>
 </body>
 </html>
