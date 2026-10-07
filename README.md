@@ -4,7 +4,8 @@
 **Double-click `index.html`.** That's it! It opens in your web browser.
 
 - ❌ No installing anything
-- ❌ No internet needed
+- ❌ No internet needed (except for Family Sync)
+- 🌐 Or just open the website: https://ilikevibecoding26.github.io/triple-e-episode-planner/
 - ✅ Everything you add is saved automatically in your browser, so it's still there next time
 
 > Use the same browser each time (e.g. always Safari or always Chrome) — each browser keeps its own saved stuff.
@@ -21,6 +22,8 @@
 **📋 Planner** — Five columns: **Idea → Planned → Filming → Editing → Posted**. Move cards with ◀ ▶, or drag them. Click a title (or ✏️ notes) to add title options, a thumbnail idea, a spoken hook, and a punishment.
 
 **🎉 Fun Extras** — Punishment picker, a title helper (*Who + What + Hook*), and a random intro-line picker.
+
+**👨‍👩‍👧 Family Sync** (in Fun Extras) — Type your secret family code and press Connect. Everyone who uses the same code shares ONE planner, and changes show up on everyone's screen within a few seconds. This part needs the internet; if you're offline, changes wait and sync later. Keep the code secret!
 
 The stats line at the top shows how many ideas are banked and where your episodes are.
 

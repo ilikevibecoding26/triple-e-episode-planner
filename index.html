@@ -129,6 +129,7 @@
 <header>
   <h1>🎬 Triple E Studios Episode Planner 🎬</h1>
   <div id="stats"></div>
+  <div id="syncPill" style="margin-top:4px;font-size:.9rem;cursor:pointer"></div>
 </header>
 
 <nav>
@@ -234,6 +235,21 @@
       <p>Formula: <b>[Who] + [What challenge] + [Curiosity hook]</b></p>
       <div id="titleOut">Press the button!</div>
       <button class="btn big purple" id="titleBtn">✨ Make a title</button>
+    </div>
+    <div class="panel center" id="familyPanel">
+      <h2>👨‍👩‍👧 Family Sync</h2>
+      <p>Type your secret <b>family code</b> so all three of you share ONE planner. Everyone must use the exact same code!</p>
+      <div id="familyJoin">
+        <div class="row">
+          <input id="familyCode" type="password" autocomplete="off" placeholder="Secret family code (6+ letters)" style="max-width:320px">
+          <button class="btn green" id="familyJoinBtn">🔗 Connect</button>
+        </div>
+        <p><small>🤫 Don't post your code anywhere public. Anyone who knows it can change your planner.</small></p>
+      </div>
+      <div id="familyConnected" hidden>
+        <p id="familyStatus" style="font-weight:bold"></p>
+        <button class="btn small ghost" id="familyLeaveBtn">Disconnect this device</button>
+      </div>
     </div>
     <div class="panel center">
       <h2>📦 Share &amp; Backup</h2>
@@ -436,7 +452,11 @@ let episodes = load(EPISODES_KEY, []);
 // Shorts get their own saved list so they stay separate from full-episode ideas
 let shorts = load("tes_shorts_v1", null) ||
   SHORT_SEEDS.map(([title, desc, channel]) => ({ id: newId(), title, channel, desc, used: false, custom: false }));
-function saveAll() { save(IDEAS_KEY, ideas); save(EPISODES_KEY, episodes); save("tes_shorts_v1", shorts); renderAll(); }
+function saveAll() {
+  save(IDEAS_KEY, ideas); save(EPISODES_KEY, episodes); save("tes_shorts_v1", shorts);
+  renderAll();
+  pushChanges(); // send changes to the family database (does nothing if not connected)
+}
 
 /* ---------- 3. HELPERS ---------- */
 const $ = id => document.getElementById(id);
@@ -700,8 +720,10 @@ $("epForm").addEventListener("submit", () => {
     title: $("epTitle").value.trim(), channel: $("epChannel").value, status: $("epStatus").value, desc: $("epDesc").value.trim(),
     titleOpts: $("epTitleOpts").value, thumb: $("epThumb").value, hook: $("epHook").value, punish: $("epPunish").value
   };
-  if (editingId) Object.assign(episodes.find(e => e.id === editingId), data);
-  else episodes.push({ id: newId(), ...data });
+  // (If a sibling deleted this card while you were editing it, we just add it back.)
+  const existing = editingId && episodes.find(e => e.id === editingId);
+  if (existing) Object.assign(existing, data);
+  else episodes.push({ id: editingId || newId(), ...data });
   saveAll();
 });
 
@@ -774,9 +796,193 @@ $("importFile").addEventListener("change", e => {
   reader.readAsText(file);
 });
 
+/* ---------- 4f. FAMILY SYNC ----------
+   The family's planner lives in an online database (Supabase).
+   We still keep a copy in localStorage, so the app works even offline.
+
+   How syncing works:
+   - "synced" remembers what each item looked like the last time the database
+     and this device agreed. Key = "kind:id", e.g. "episodes:abc123".
+   - PUSH: after any change, compare every item to "synced". Anything new or
+     different gets sent up. Anything in "synced" that's gone was deleted, so
+     we send a "deleted" note for it.
+   - PULL: every few seconds, ask the database "what changed since last time?"
+     and copy those changes into our lists.
+   The family code is checked by the database itself, so without the right
+   code nobody can read or change your planner. */
+const SUPABASE_URL = "https://ylbkbdwpxhsdrhnscchz.supabase.co";
+// This "publishable" key is meant to be public. It can ONLY call our 3 functions,
+// and each of those needs the secret family code.
+const SUPABASE_KEY = "sb_publishable_CeCa3RtSDuNTyCUUuDR7VA_Jz1H_qOV";
+const KINDS = ["ideas", "shorts", "episodes"];
+
+let familyCode = load("tes_family_code", null);
+let synced = load("tes_synced_v1", {});
+let lastPull = load("tes_last_pull", "1970-01-01T00:00:00Z");
+let online = true;
+let pushing = false, pushAgain = false;
+
+// The three lists, looked up by name (so we can loop over them)
+function getList(kind) { return kind === "ideas" ? ideas : kind === "shorts" ? shorts : episodes; }
+function setList(kind, list) { if (kind === "ideas") ideas = list; else if (kind === "shorts") shorts = list; else episodes = list; }
+
+// Call one of our database functions. Like sending a letter and waiting for the reply.
+async function callDb(fn, args) {
+  const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(args)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+function saveSyncState() { save("tes_synced_v1", synced); save("tes_last_pull", lastPull); }
+
+async function pushChanges() {
+  if (!familyCode) return;
+  if (pushing) { pushAgain = true; return; } // a push is already running; do one more after it
+  pushing = true;
+  try {
+    const changes = [];
+    const seen = new Set();
+    KINDS.forEach(kind => getList(kind).forEach(item => {
+      const key = kind + ":" + item.id;
+      seen.add(key);
+      const json = JSON.stringify(item);
+      if (synced[key] !== json) changes.push({ kind, id: item.id, data: item, json, key });
+    }));
+    Object.keys(synced).forEach(key => {
+      if (!seen.has(key)) {
+        const [kind, ...rest] = key.split(":");
+        changes.push({ kind, id: rest.join(":"), deleted: true, key });
+      }
+    });
+    // Send in batches of 200 so no single message is too big
+    for (let i = 0; i < changes.length; i += 200) {
+      const batch = changes.slice(i, i + 200);
+      await callDb("push_items", { code: familyCode, changes: batch.map(({ kind, id, data, deleted }) => ({ kind, id, data, deleted: !!deleted })) });
+      batch.forEach(c => { if (c.deleted) delete synced[c.key]; else synced[c.key] = c.json; });
+    }
+    saveSyncState();
+    setOnline(true);
+  } catch (e) {
+    setOnline(false); // we'll try again on the next tick
+  } finally {
+    pushing = false;
+    if (pushAgain) { pushAgain = false; pushChanges(); }
+  }
+}
+
+async function pullChanges() {
+  if (!familyCode) return;
+  try {
+    // (The database looks back a few extra seconds, so we may get a change twice. That's harmless.)
+    const rows = await callDb("pull_items", { code: familyCode, since: lastPull });
+    let changed = false;
+    rows.forEach(row => {
+      const key = row.kind + ":" + row.id;
+      if (row.updated_at > lastPull) lastPull = row.updated_at;
+      const list = getList(row.kind);
+      const i = list.findIndex(x => x.id === row.id);
+      if (row.deleted) {
+        if (key in synced || i >= 0) { delete synced[key]; if (i >= 0) list.splice(i, 1); changed = true; }
+        return;
+      }
+      const json = JSON.stringify(row.data);
+      if (synced[key] === json) return; // we already have this exact version
+      synced[key] = json;
+      if (i >= 0) list[i] = row.data; else list.push(row.data);
+      changed = true;
+    });
+    saveSyncState();
+    setOnline(true);
+    if (changed) {
+      save(IDEAS_KEY, ideas); save(EPISODES_KEY, episodes); save("tes_shorts_v1", shorts);
+      renderAll();
+    }
+  } catch (e) {
+    setOnline(false);
+  }
+}
+
+// Joining: download the family's planner and combine it with what's on this device.
+async function joinFamily(code) {
+  const isNew = await callDb("join_family", { code });
+  const rows = await callDb("pull_items", { code, since: "1970-01-01T00:00:00Z" });
+  familyCode = code;
+  synced = {};
+  lastPull = "1970-01-01T00:00:00Z";
+  KINDS.forEach(kind => {
+    const server = [];
+    rows.filter(r => r.kind === kind).forEach(r => {
+      if (r.updated_at > lastPull) lastPull = r.updated_at;
+      if (r.deleted) return;
+      server.push(r.data);
+      synced[kind + ":" + r.id] = JSON.stringify(r.data);
+    });
+    // Keep local items the family doesn't have yet. Starter ideas match by
+    // title + channel, because each device gave them different random ids.
+    const extras = getList(kind).filter(mine => !server.some(s =>
+      s.id === mine.id || (kind !== "episodes" && s.title === mine.title && s.channel === mine.channel)));
+    setList(kind, [...server, ...extras]);
+  });
+  save("tes_family_code", familyCode);
+  saveAll(); // saves locally, redraws, and uploads our extras
+  return isNew;
+}
+
+function setOnline(isOnline) { online = isOnline; renderSync(); }
+
+function renderSync() {
+  $("familyJoin").hidden = !!familyCode;
+  $("familyConnected").hidden = !familyCode;
+  const text = !familyCode ? "📴 Not sharing yet — tap to connect with your family"
+    : online ? "🟢 Sharing with your family" : "🟠 Can't reach the internet — changes will sync later";
+  $("syncPill").textContent = text;
+  $("familyStatus").textContent = text;
+}
+
+$("familyJoinBtn").addEventListener("click", async () => {
+  const code = $("familyCode").value.trim();
+  if (code.length < 6) { showToast("🔑 The family code needs at least 6 letters."); return; }
+  $("familyJoinBtn").disabled = true;
+  try {
+    const isNew = await joinFamily(code);
+    $("familyCode").value = "";
+    showToast(isNew ? "🎉 New family planner made! Give your siblings the same code."
+                    : "🔗 Connected! You're sharing the family planner.");
+  } catch (e) {
+    showToast("😕 Couldn't connect. Check your internet and try again.");
+  } finally {
+    $("familyJoinBtn").disabled = false;
+  }
+});
+
+$("familyLeaveBtn").addEventListener("click", e => twoTapDelete(e.currentTarget, "Disconnect this device", () => {
+  // Stops sharing on THIS device only. Your local copy stays; the family planner is untouched.
+  familyCode = null; synced = {}; lastPull = "1970-01-01T00:00:00Z";
+  try { localStorage.removeItem("tes_family_code"); } catch (err) {}
+  saveSyncState(); renderSync();
+  showToast("📴 Disconnected. This device keeps its own copy now.");
+}));
+
+// Tapping the status line jumps to the Family Sync box
+$("syncPill").addEventListener("click", () => {
+  document.querySelector("[data-page=extras]").click();
+  $("familyPanel").scrollIntoView({ behavior: "smooth" });
+});
+
+// Check for siblings' changes every 5 seconds, and right away when you come back to the tab
+setInterval(() => { pushChanges(); pullChanges(); }, 5000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pullChanges(); });
+
 /* ---------- Draw everything ---------- */
 function renderAll() { renderStats(); renderBank(); renderShorts(); renderBoard(); }
 renderAll();
+renderSync();
+pullChanges();
 </script>
 </body>
 </html>
