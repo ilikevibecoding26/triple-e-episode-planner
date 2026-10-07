@@ -160,6 +160,20 @@
   .switch input:focus-visible + .slider { outline: 3px solid var(--purple); outline-offset: 2px; }
   html.no-emoji #chatList:empty::before { content: "No messages yet — be the first to say hi!"; }
   html.no-emoji #commentList:empty::before { content: "No comments yet — what do you think of this idea?"; }
+  /* ---- Dates, jobs, checklist, votes ---- */
+  .ep .meta { font-size: .78rem; margin: 2px 0 6px; display: flex; flex-wrap: wrap; gap: 2px 10px; }
+  .late { color: #ef4444; font-weight: bold; }
+  html.dark .late { color: #fb7185; }
+  .job-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--purple-soft); border: 2px solid var(--ink); border-radius: 999px; padding: 2px 4px 2px 10px; margin: 2px; font-size: .85rem; }
+  .job-chip button { border: none; background: none; color: var(--ink); cursor: pointer; font-weight: bold; padding: 0 4px; }
+  .check-item { display: flex; align-items: center; gap: 10px; padding: 5px 0; margin: 0; font-weight: normal; cursor: pointer; }
+  .check-item input { width: 20px; height: 20px; flex: none; accent-color: var(--gaming); }
+  .check-item span { flex: 1; }
+  .check-item.done span { text-decoration: line-through; opacity: .6; }
+  .check-item button { border: none; background: none; color: var(--ink); cursor: pointer; opacity: .5; font-size: 1rem; }
+  #epChecklist, #checkOff { border-top: 3px dashed var(--ink); margin-top: 8px; }
+  .soon-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 2px solid var(--ink); border-radius: 12px; margin: 6px 0; cursor: pointer; background: var(--card-alt); }
+  .soon-day { font-weight: bold; min-width: 96px; }
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, calc(100% + 40px)); opacity: 0; z-index: 10;
     background: var(--gaming); color: white; font-weight: bold; padding: 14px 22px;
@@ -268,6 +282,14 @@
   <section class="page" id="page-planner">
     <p class="center"><button class="btn purple" id="newEpBtn">➕ New episode</button>
     <br><small>Tip: drag cards between columns, or use the ◀ ▶ buttons. Click a title or ✏️ to edit notes, 💬 to comment, and 🗑️ (tap twice) to delete!</small></p>
+    <div class="panel" id="comingUpPanel">
+      <h2 style="margin:0 0 6px">📅 Coming up</h2>
+      <div id="comingUp"></div>
+    </div>
+    <div class="row" style="justify-content:flex-start;margin-bottom:10px">
+      <label for="boardWho" style="margin:0">🙋 Show cards for:</label>
+      <select id="boardWho" style="width:auto"></select>
+    </div>
     <div id="board"></div>
   </section>
 
@@ -308,6 +330,16 @@
         </form>
       </div>
       <p class="center" style="margin:18px 0 8px"><small>The settings below are just for <b>you</b>, on this device.</small></p>
+      <div class="setting" style="flex-wrap:wrap;margin-bottom:10px">
+        <div style="flex:1 1 220px">
+          <div class="setting-name">👤 Your name</div>
+          <div class="setting-help">Used for chat, comments, votes, and "Show cards for".</div>
+        </div>
+        <form id="nameForm" class="row" style="flex:1 1 260px;flex-wrap:nowrap">
+          <input id="nameInput" maxlength="30" placeholder="e.g. Big Sis">
+          <button class="btn small green" type="submit">Save</button>
+        </form>
+      </div>
       <div class="setting" style="margin-bottom:10px">
         <div>
           <div class="setting-name">🌙 Dark mode</div>
@@ -387,6 +419,21 @@
     <label>Title</label><input id="epTitle" required maxlength="80">
     <label>Channel</label><select id="epChannel"><option>Gaming</option><option>Challenge</option></select>
     <label>Status</label><select id="epStatus"></select>
+    <div class="row" style="justify-content:flex-start;align-items:flex-end">
+      <div style="flex:1 1 150px"><label for="epFilmDate">🎬 Film on</label><input type="date" id="epFilmDate"></div>
+      <div style="flex:1 1 150px"><label for="epPostDate">📤 Post on</label><input type="date" id="epPostDate"></div>
+    </div>
+    <label>🙋 Who's doing what</label>
+    <div id="jobList"></div>
+    <div class="row" style="justify-content:flex-start">
+      <input id="jobWho" list="familyNames" maxlength="30" placeholder="Who?" style="flex:1 1 140px;width:auto;min-width:0;max-width:100%">
+      <select id="jobWhat" style="width:auto">
+        <option>Starring</option><option>Filming</option><option>Editing</option><option>Thumbnail</option>
+        <option>Directing</option><option>Props</option><option>Uploading</option>
+      </select>
+      <button class="btn small purple" type="button" id="jobAdd">Add</button>
+    </div>
+    <datalist id="familyNames"></datalist>
     <label>Concept</label><textarea id="epDesc" rows="2"></textarea>
     <label>Title options</label><textarea id="epTitleOpts" rows="2" placeholder="A few possible video titles"></textarea>
     <label>Thumbnail idea</label><textarea id="epThumb" rows="2"></textarea>
@@ -398,6 +445,17 @@
       <button class="btn orange" type="button" id="epDelete">🗑️ Delete</button>
     </p>
   </form>
+  <!-- The checklist also lives OUTSIDE the form, so ticking a box saves right away -->
+  <div id="epChecklist">
+    <h3 style="margin-bottom:6px">✅ Checklist <span id="checkProgress"></span></h3>
+    <div id="checkItems"></div>
+    <button class="btn small purple" type="button" id="checkDefaultBtn">➕ Add the usual checklist</button>
+    <form id="checkForm" class="row" style="flex-wrap:nowrap;margin-top:6px">
+      <input id="checkText" maxlength="80" autocomplete="off" placeholder="Add your own step...">
+      <button class="btn small green" type="submit">Add</button>
+    </form>
+  </div>
+  <div id="checkOff" class="empty">💾 Save this new card first, then it gets a checklist!</div>
   <!-- Comments live OUTSIDE the form above, so sending a comment doesn't close the pop-up -->
   <div id="epComments">
     <h3 style="margin-bottom:6px">💬 Family comments</h3>
@@ -674,13 +732,14 @@ $("bankFilter").addEventListener("change", renderBank);
 
 function renderBank() {
   const f = $("bankFilter").value;
-  const shown = ideas.filter(i => f === "Any" || i.channel === f);
+  const shown = byVotes(ideas.filter(i => f === "Any" || i.channel === f));
   $("bankCount").textContent = shown.length;
   $("bankGrid").replaceChildren(...shown.map(idea => el("div", { class: "idea accent-" + idea.channel + (idea.used ? " used" : "") },
     chip(idea.channel), idea.used ? el("span", {}, " ✅ done") : "", idea.custom ? el("span", {}, " ⭐ ours") : "",
     el("h3", {}, idea.title),
     el("p", {}, idea.desc),
     el("div", { class: "row", style: "justify-content:flex-start" },
+      voteButton(idea),
       el("button", { class: "btn small green", onclick: () => addEpisode({ title: idea.title, channel: idea.channel, desc: idea.desc }) }, "📋 Plan it"),
       el("button", { class: "btn small ghost", onclick: () => { idea.used = !idea.used; saveAll(); } }, idea.used ? "↩️ Not done" : "✅ Did it"),
       el("button", { class: "btn small orange", title: "Delete", onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => { ideas = ideas.filter(i => i.id !== idea.id); saveAll(); }) }, "🗑️")
@@ -733,11 +792,12 @@ $("shortForm").addEventListener("submit", e => {
 
 function renderShorts() {
   $("shortCount").textContent = shorts.length;
-  $("shortGrid").replaceChildren(...shorts.map(s => el("div", { class: "idea accent-" + s.channel + (s.used ? " used" : "") },
+  $("shortGrid").replaceChildren(...byVotes(shorts).map(s => el("div", { class: "idea accent-" + s.channel + (s.used ? " used" : "") },
     chip(s.channel), s.used ? el("span", {}, " ✅ done") : "", s.custom ? el("span", {}, " ⭐ ours") : "",
     el("h3", {}, s.title),
     el("p", {}, s.desc),
     el("div", { class: "row", style: "justify-content:flex-start" },
+      voteButton(s),
       el("button", { class: "btn small green", onclick: () => addEpisode({ title: s.title, channel: s.channel, desc: s.desc, isShort: true }) }, "📋 Plan it"),
       el("button", { class: "btn small ghost", onclick: () => { s.used = !s.used; saveAll(); } }, s.used ? "↩️ Not done" : "✅ Did it"),
       el("button", { class: "btn small orange", title: "Delete", onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => { shorts = shorts.filter(x => x.id !== s.id); saveAll(); }) }, "🗑️")
@@ -748,7 +808,8 @@ function renderShorts() {
 /* ---------- 4c. PLANNER PAGE ---------- */
 function addEpisode({ title, channel, desc, isShort = false }) {
   // isShort marks the card as a YouTube Short so it gets a ⚡ badge on the board
-  episodes.push({ id: newId(), title, channel, desc: desc || "", isShort, status: "Idea", titleOpts: "", thumb: "", hook: "", punish: "" });
+  episodes.push({ id: newId(), title, channel, desc: desc || "", isShort, status: "Idea", titleOpts: "", thumb: "", hook: "", punish: "",
+                  filmDate: "", postDate: "", jobs: [], checklist: defaultChecklist() });
   saveAll();
   showToast("✅ \"" + title + "\" was sent to the Planner!");
 }
@@ -780,9 +841,11 @@ function shift(ep, dir) {
 }
 
 function renderBoard() {
+  renderWhoPicker();
+  renderComingUp();
   $("board").replaceChildren(...STAGES.map(stage => {
     const col = el("div", { class: "col", "data-stage": stage }, el("h3", {}, stage));
-    const mine = episodes.filter(e => e.status === stage);
+    const mine = visibleEpisodes().filter(e => e.status === stage);
     if (!mine.length) col.append(el("div", { class: "empty" }, "Nothing here yet"));
 
     /* DRAG & DROP, in plain words:
@@ -805,6 +868,7 @@ function renderBoard() {
         chip(ep.channel), ep.isShort ? el("span", { class: "chip Short" }, "⚡ Short") : "",
         el("h4", { onclick: () => openEpisode(ep) }, ep.title),
         el("p", {}, ep.desc),
+        cardMeta(ep),
         el("div", { class: "moves" },
           el("button", { class: "btn small ghost", onclick: () => shift(ep, -1) }, "◀"),
           el("button", { class: "btn small ghost", title: "Edit", onclick: () => openEpisode(ep) }, "✏️"),
@@ -835,6 +899,12 @@ function openEpisode(ep, jumpToComments = false) {
   $("epThumb").value = ep ? ep.thumb : "";
   $("epHook").value = ep ? ep.hook : "";
   $("epPunish").value = ep ? ep.punish : "";
+  $("epFilmDate").value = (ep && ep.filmDate) || "";
+  $("epPostDate").value = (ep && ep.postDate) || "";
+  draftJobs = ep && ep.jobs ? ep.jobs.map(j => ({ ...j })) : []; // a copy, so Cancel throws changes away
+  $("jobWho").value = "";
+  renderJobs();
+  renderChecklist();
   $("epDelete").hidden = !ep;
   renderComments();
   if (ep) markCommentsSeen(ep.id);
@@ -863,12 +933,13 @@ function deleteEpisode(id) {
 $("epForm").addEventListener("submit", () => {
   const data = {
     title: $("epTitle").value.trim(), channel: $("epChannel").value, status: $("epStatus").value, desc: $("epDesc").value.trim(),
-    titleOpts: $("epTitleOpts").value, thumb: $("epThumb").value, hook: $("epHook").value, punish: $("epPunish").value
+    titleOpts: $("epTitleOpts").value, thumb: $("epThumb").value, hook: $("epHook").value, punish: $("epPunish").value,
+    filmDate: $("epFilmDate").value, postDate: $("epPostDate").value, jobs: draftJobs
   };
   // (If a sibling deleted this card while you were editing it, we just add it back.)
   const existing = editingId && episodes.find(e => e.id === editingId);
   if (existing) Object.assign(existing, data);
-  else episodes.push({ id: editingId || newId(), ...data });
+  else episodes.push({ id: editingId || newId(), checklist: defaultChecklist(), ...data });
   saveAll();
 });
 
@@ -1110,7 +1181,7 @@ $("familyJoinBtn").addEventListener("click", async () => {
     const isNew = await joinFamily(code);
     $("familyCode").value = "";
     resetChat(); pullMessages();
-    resetComments(); pullComments();
+    resetComments(); pullComments(); pullVotes();
     showToast(isNew ? "🎉 New family planner made! Give your siblings the same code."
                     : "🔗 Connected! You're sharing the family planner.");
   } catch (e) {
@@ -1125,6 +1196,7 @@ $("familyLeaveBtn").addEventListener("click", e => twoTapDelete(e.currentTarget,
   familyCode = null; synced = {}; lastPull = "1970-01-01T00:00:00Z";
   try { localStorage.removeItem("tes_family_code"); } catch (err) {}
   saveSyncState(); renderSync(); resetChat(); resetComments();
+  votesByItem = {}; renderBank(); renderShorts();
   showToast("📴 Disconnected. This device keeps its own copy now.");
 }));
 
@@ -1288,7 +1360,7 @@ $("commentForm").addEventListener("submit", async e => {
 });
 
 // Check for siblings' changes (and new messages) every 5 seconds, and right away when you come back
-setInterval(() => { pushChanges(); pullChanges(); pullMessages(); pullComments(); pullChannelName(); }, 5000);
+setInterval(() => { pushChanges(); pullChanges(); pullMessages(); pullComments(); pullChannelName(); pullVotes(); }, 5000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { pullChanges(); pullMessages(); pullComments(); } });
 
 /* ---------- 4i. SETTINGS: EMOJI ON/OFF ----------
@@ -1383,8 +1455,233 @@ async function pullChannelName() {
 
 renderChannelName();
 
+/* ---------- 4l. YOUR NAME ----------
+   One name per device, used by chat, comments, votes and "Show cards for". */
+function myName() { return (chatName || "").trim(); }
+
+function setMyName(name) {
+  chatName = name.trim();
+  save("tes_chat_name", chatName);
+  $("chatName").value = chatName;
+  $("commentName").value = chatName;
+  $("nameInput").value = chatName;
+  renderBank(); renderShorts(); renderBoard();
+}
+$("nameInput").value = myName();
+$("nameForm").addEventListener("submit", e => {
+  e.preventDefault();
+  if (!$("nameInput").value.trim()) { showToast("✏️ Type your name first!"); return; }
+  setMyName($("nameInput").value);
+  $("nameInput").blur();
+  showToast("👋 Hi, " + myName() + "!");
+});
+$("chatName").addEventListener("change", () => setMyName($("chatName").value));
+
+// A word to use instead of an emoji when emojis are turned off in Settings
+function ico(emoji, word) { return emojisOn ? emoji : word; }
+
+/* ---------- 4m. DATES ----------
+   Dates are saved as text like "2026-10-10" (year-month-day). Text in that
+   shape sorts in the right order, so "is it before today?" is just text < text. */
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function addDays(dateStr, n) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d + n);
+  return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+}
+// "Today", "Tomorrow", or "Sat, Oct 10"
+function dayLabel(dateStr) {
+  const today = todayStr();
+  if (dateStr === today) return "Today";
+  if (dateStr === addDays(today, 1)) return "Tomorrow";
+  if (dateStr === addDays(today, -1)) return "Yesterday";
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+}
+// Late = the date has passed but the card hasn't reached that stage yet
+function filmLate(ep) { return ep.filmDate && ep.filmDate < todayStr() && (ep.status === "Idea" || ep.status === "Planned"); }
+function postLate(ep) { return ep.postDate && ep.postDate < todayStr() && ep.status !== "Posted"; }
+
+// The little line on each card: dates, jobs, checklist progress
+function cardMeta(ep) {
+  const bits = [];
+  if (ep.filmDate) bits.push(el("span", { class: filmLate(ep) ? "late" : "" }, ico("🎬", "Film:") + " " + dayLabel(ep.filmDate) + (filmLate(ep) ? " (late!)" : "")));
+  if (ep.postDate) bits.push(el("span", { class: postLate(ep) ? "late" : "" }, ico("📤", "Post:") + " " + dayLabel(ep.postDate) + (postLate(ep) ? " (late!)" : "")));
+  (ep.jobs || []).forEach(j => bits.push(el("span", {}, "🙋 " + j.who + ": " + j.what)));
+  const list = ep.checklist || [];
+  if (list.length) bits.push(el("span", {}, ico("✅", "Done:") + " " + list.filter(c => c.done).length + "/" + list.length));
+  return bits.length ? el("div", { class: "meta" }, ...bits) : "";
+}
+
+// The "Coming up" box: film + post dates from yesterday-ish to 2 weeks ahead (plus anything late)
+function renderComingUp() {
+  const soon = addDays(todayStr(), 14);
+  const events = [];
+  visibleEpisodes().forEach(ep => {
+    if (ep.filmDate && (ep.status === "Idea" || ep.status === "Planned") && ep.filmDate <= soon)
+      events.push({ date: ep.filmDate, ep, label: "🎬 Film", late: filmLate(ep) });
+    if (ep.postDate && ep.status !== "Posted" && ep.postDate <= soon)
+      events.push({ date: ep.postDate, ep, label: "📤 Post", late: postLate(ep) });
+  });
+  events.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  $("comingUp").replaceChildren(...(events.length ? events.map(ev =>
+    el("div", { class: "soon-row", onclick: () => openEpisode(ev.ep) },
+      el("span", { class: "soon-day" + (ev.late ? " late" : "") }, ev.late ? "Late! " + dayLabel(ev.date) : dayLabel(ev.date)),
+      el("span", {}, ev.label + ": " + ev.ep.title))
+  ) : [el("div", { class: "empty" }, "Nothing scheduled in the next 2 weeks. Open a card and pick a 🎬 Film on date!")]));
+}
+
+/* ---------- 4n. WHO'S DOING WHAT ----------
+   Each card has a list of jobs like { who: "Big Sis", what: "Editing" }.
+   In the pop-up we edit a COPY (draftJobs); it's only saved when you press Save. */
+let draftJobs = [];
+let boardWho = load("tes_board_who", "Everyone");
+
+// Everybody we know about: names on jobs, plus you
+function familyNames() {
+  const names = new Set();
+  episodes.forEach(ep => (ep.jobs || []).forEach(j => names.add(j.who)));
+  if (myName()) names.add(myName());
+  return [...names].sort();
+}
+
+function renderJobs() {
+  $("jobList").replaceChildren(...draftJobs.map((j, i) =>
+    el("span", { class: "job-chip" }, j.who + ": " + j.what,
+      el("button", { type: "button", title: "Remove", onclick: () => { draftJobs.splice(i, 1); renderJobs(); } }, "✕"))));
+  // Suggestions that pop up while typing a name
+  $("familyNames").replaceChildren(...familyNames().map(n => el("option", { value: n })));
+  if (!$("jobWho").value && myName()) $("jobWho").placeholder = "Who? (e.g. " + myName() + ")";
+}
+
+function addJob() {
+  const who = $("jobWho").value.trim();
+  if (!who) { showToast("✏️ Type who's doing it!"); $("jobWho").focus(); return; }
+  draftJobs.push({ who, what: $("jobWhat").value });
+  $("jobWho").value = "";
+  renderJobs();
+}
+$("jobAdd").addEventListener("click", addJob);
+// Pressing Enter in the name box adds the job (instead of saving + closing the whole card)
+$("jobWho").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addJob(); } });
+
+// Which cards to show on the board
+function visibleEpisodes() {
+  if (boardWho === "Everyone") return episodes;
+  return episodes.filter(ep => (ep.jobs || []).some(j => j.who === boardWho));
+}
+
+function renderWhoPicker() {
+  const names = familyNames();
+  if (boardWho !== "Everyone" && !names.includes(boardWho)) names.push(boardWho);
+  const picker = $("boardWho");
+  picker.replaceChildren(el("option", { value: "Everyone" }, "Everyone"),
+    ...names.map(n => el("option", { value: n }, n === myName() ? n + " (me)" : n)));
+  picker.value = boardWho;
+}
+$("boardWho").addEventListener("change", () => {
+  boardWho = $("boardWho").value;
+  save("tes_board_who", boardWho);
+  renderBoard();
+});
+
+/* ---------- 4o. CHECKLIST ----------
+   Each card has a list like [{ id, text, done }]. Ticking a box saves straight away
+   (and syncs to the family), no Save button needed. */
+const USUAL_STEPS = ["Plan & props ready", "Camera / recording ready", "Filmed", "Edited",
+                     "Thumbnail made", "Title & description written", "Uploaded"];
+function defaultChecklist() { return USUAL_STEPS.map(text => ({ id: newId(), text, done: false })); }
+
+function openCard() { return editingId ? episodes.find(e => e.id === editingId) : null; }
+
+function renderChecklist() {
+  const ep = openCard();
+  $("epChecklist").hidden = !ep; // brand-new cards get their checklist when you press Save
+  $("checkOff").hidden = !!ep;
+  if (!ep) return;
+  const list = ep.checklist || [];
+  const done = list.filter(c => c.done).length;
+  $("checkProgress").textContent = list.length ? "(" + done + "/" + list.length + (done === list.length ? " — all done! 🎉)" : ")") : "";
+  $("checkDefaultBtn").hidden = list.length > 0;
+  $("checkItems").replaceChildren(...list.map(item => {
+    const box = el("input", { type: "checkbox" });
+    box.checked = item.done;
+    box.addEventListener("change", () => { item.done = box.checked; saveAll(); });
+    return el("label", { class: "check-item" + (item.done ? " done" : "") }, box, el("span", {}, item.text),
+      el("button", { type: "button", title: "Remove step", onclick: e => {
+        e.preventDefault(); // don't tick the box when you press ✕
+        ep.checklist = list.filter(c => c.id !== item.id); saveAll();
+      } }, "✕"));
+  }));
+}
+
+$("checkDefaultBtn").addEventListener("click", () => {
+  const ep = openCard(); if (!ep) return;
+  ep.checklist = defaultChecklist(); saveAll();
+});
+$("checkForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const ep = openCard(); const text = $("checkText").value.trim();
+  if (!ep || !text) return;
+  ep.checklist = [...(ep.checklist || []), { id: newId(), text, done: false }];
+  $("checkText").value = "";
+  saveAll();
+});
+
+/* ---------- 4p. IDEA VOTING ----------
+   Votes live in their own database table: one row per (idea, person).
+   votesByItem looks like { ideaId: ["Big Sis", "Little Bro"] } */
+let votesByItem = {};
+
+async function pullVotes() {
+  if (!familyCode) return;
+  try {
+    const rows = await callDb("get_votes", { code: familyCode });
+    const next = {};
+    rows.forEach(r => (next[r.item_id] = next[r.item_id] || []).push(r.voter));
+    if (JSON.stringify(next) === JSON.stringify(votesByItem)) return; // nothing changed
+    votesByItem = next;
+    renderBank(); renderShorts();
+  } catch (e) { /* offline: try later */ }
+}
+
+// Most votes first. Ideas with the same number of votes keep their normal order.
+function byVotes(list) {
+  return list.map((item, i) => ({ item, i })).sort((a, b) =>
+    ((votesByItem[b.item.id] || []).length - (votesByItem[a.item.id] || []).length) || a.i - b.i).map(x => x.item);
+}
+
+function voteButton(idea) {
+  const voters = votesByItem[idea.id] || [];
+  const iVoted = voters.includes(myName());
+  return el("button", {
+    class: "btn small " + (iVoted ? "" : "ghost"), // pink when YOU voted for it
+    title: voters.length ? "Votes: " + voters.join(", ") : "Vote for this idea!",
+    onclick: () => toggleVote(idea)
+  }, ico("👍", "Vote") + (voters.length ? " " + voters.length : ""));
+}
+
+async function toggleVote(idea) {
+  if (!familyCode) { showToast("🔗 Connect with your family code (Fun Extras) to vote!"); return; }
+  if (!myName()) { showToast("👤 Set your name in ⚙️ Settings first, so we know who voted!"); return; }
+  const voters = votesByItem[idea.id] || [];
+  const up = !voters.includes(myName());
+  // Update the screen right away, then tell the database
+  votesByItem[idea.id] = up ? [...voters, myName()] : voters.filter(v => v !== myName());
+  renderBank(); renderShorts();
+  try { await callDb("set_vote", { code: familyCode, item_id: idea.id, voter: myName(), up }); }
+  catch (e) { showToast("😕 Vote didn't save. Check your internet!"); }
+  pullVotes();
+}
+
 /* ---------- Draw everything ---------- */
-function renderAll() { renderStats(); renderBank(); renderShorts(); renderBoard(); }
+function renderAll() {
+  renderStats(); renderBank(); renderShorts(); renderBoard();
+  if ($("epDialog").open) renderChecklist();
+}
 renderAll();
 
 // Open the tab you were on last time
@@ -1403,6 +1700,7 @@ pullChanges();
 pullMessages();
 pullComments();
 pullChannelName();
+pullVotes();
 </script>
 </body>
 </html>

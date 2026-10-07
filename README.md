@@ -21,6 +21,10 @@
 
 **📋 Planner** — Five columns: **Idea → Planned → Filming → Editing → Posted**. Move cards with ◀ ▶, or drag them. Click a title (or ✏️) to add title options, a thumbnail idea, a spoken hook, and a punishment. Tap 🗑️ twice to delete a card.
 
+**📅 Dates, 🙋 jobs & ✅ checklists** (in each planner card) — Pick a *Film on* and *Post on* date, add who's doing what (like "Big Sis: Editing"), and tick off the filming checklist. The **Coming up** box at the top of the Planner shows the next 2 weeks (late stuff turns red), and **Show cards for** filters the board to one person.
+
+**👍 Voting** (Idea Bank & Shorts) — Vote for the ideas you like best; the most-voted ideas float to the top. Needs your family code and your name (⚙️ Settings).
+
 **🎉 Fun Extras** — Punishment picker, a title helper (*Who + What + Hook*), and a random intro-line picker.
 
 **👨‍👩‍👧 Family Sync** (in Fun Extras) — Type your secret family code and press Connect. Everyone who uses the same code shares ONE planner, and changes show up on everyone's screen within a few seconds. This part needs the internet; if you're offline, changes wait and sync later. Keep the code secret!
@@ -31,6 +35,7 @@
 
 **⚙️ Settings**
 - **📺 Channel name** — Change the name at the top of the app. If you're connected with your family code, everyone sees the new name.
+- **👤 Your name** — Used for chat, comments, votes and jobs.
 - **🌙 Dark mode** — Darker colors for nighttime (just on your device).
 - **😀 Show emojis** — Flip it off if all the emojis get annoying (just on your device, on by default). Nothing you saved changes; emojis are just hidden.
 
