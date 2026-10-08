@@ -260,8 +260,16 @@
   .custom-list li { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 2px dashed var(--purple-soft); }
   .custom-list li span { flex: 1; }
   .custom-list .tag { flex: none; font-size: .75rem; opacity: .7; }
+  /* ---- Welcome / sign in ---- */
+  .welcome { position: fixed; inset: 0; z-index: 50; overflow-y: auto; display: flex; align-items: center; justify-content: center; padding: 16px;
+             background: linear-gradient(135deg, var(--purple), var(--pink), var(--challenge)); }
+  .welcome-card { background: var(--card); border: 4px solid var(--ink); border-radius: 24px; max-width: 460px; width: 100%; padding: 22px; text-align: center; box-shadow: 0 8px 0 var(--ink); }
+  .welcome-card h1 { margin-top: 0; }
+  .w-warn { border: 3px dashed var(--challenge); border-radius: 16px; padding: 10px; margin-top: 10px; }
+  .w-name { display: block; width: 100%; margin: 6px 0; font-size: 1.2rem; }
+  .link-btn { background: none; border: none; color: var(--ink); text-decoration: underline; cursor: pointer; font: inherit; opacity: .75; }
   #toast {
-    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, calc(100% + 40px)); opacity: 0; z-index: 10;
+    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, calc(100% + 40px)); opacity: 0; z-index: 60; /* above the welcome screen */
     background: var(--gaming); color: white; font-weight: bold; padding: 14px 22px;
     border: 4px solid var(--ink); border-radius: 18px; box-shadow: 0 5px 0 var(--ink);
     transition: transform .3s, opacity .3s; max-width: 90%; text-align: center; pointer-events: none;
@@ -288,6 +296,41 @@
   <button class="tab" data-page="extras">🎉 Fun Extras</button>
   <button class="tab" data-page="settings" title="Settings">⚙️ Settings</button>
 </nav>
+
+<!-- 🔑 WELCOME / SIGN IN (covers the app until you sign in or skip) -->
+<div id="welcome" class="welcome" hidden>
+  <div class="welcome-card">
+    <h1>🎬 Welcome!</h1>
+    <!-- Step 1: family code -->
+    <form id="wStep1">
+      <p><b>Step 1:</b> Type your family's secret code.</p>
+      <input id="wCode" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Secret family code (6+ letters)">
+      <p><button class="btn big green" type="submit">Next →</button></p>
+      <div id="wNewFamily" hidden class="w-warn">
+        <p>🤔 <b>No family uses this code yet.</b> Check the spelling! If you're the first one, start a new family planner with it.</p>
+        <button class="btn purple" type="button" id="wCreateFamily">✨ Start a new family</button>
+      </div>
+      <p><button class="link-btn" type="button" id="wSkip">Skip — just use it on this device</button></p>
+    </form>
+    <!-- Step 2: who are you? -->
+    <div id="wStep2" hidden>
+      <p><b>Step 2:</b> Who are you?</p>
+      <div id="wNames"></div>
+      <form id="wNewNameForm" class="row" style="flex-wrap:nowrap">
+        <input id="wNewName" maxlength="30" placeholder="I'm new! My name is...">
+        <button class="btn small green" type="submit">Next →</button>
+      </form>
+      <p><button class="link-btn" type="button" id="wBack1">← Back</button></p>
+    </div>
+    <!-- Step 3: PIN -->
+    <form id="wStep3" hidden>
+      <p id="wPinPrompt"></p>
+      <input id="wPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="PIN (4–8 numbers)" style="max-width:220px">
+      <p><button class="btn big green" type="submit">🔓 Sign in</button></p>
+      <p><button class="link-btn" type="button" id="wBack2">← Back</button></p>
+    </form>
+  </div>
+</div>
 
 <main>
   <!-- 🔔 What's new: shows up when a sibling changed something -->
@@ -492,22 +535,16 @@
 
       <!-- ✉️ DIRECT MESSAGES -->
       <div id="dmView" hidden>
-        <!-- Step 1: unlock with your name + secret PIN -->
-        <form id="dmLogin" class="center">
+        <!-- Not signed in? -->
+        <div id="dmLogin" class="center">
           <p><b>Direct messages are private.</b> Only you and the person you're messaging can read them.</p>
-          <p><small>First time? Type your name and <b>make up</b> a secret PIN (4–8 numbers). Next time, use the same PIN.
-            Don't tell anyone your PIN!</small></p>
-          <div class="row">
-            <input id="dmNameInput" maxlength="30" placeholder="Your name" style="max-width:200px">
-            <input id="dmPinInput" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="Secret PIN" style="max-width:150px">
-            <button class="btn green" type="submit">🔓 Unlock</button>
-          </div>
-        </form>
+          <button class="btn green" type="button" id="dmSignInBtn">🔑 Sign in to see your messages</button>
+        </div>
         <!-- Step 2: pick who to talk to -->
         <div id="dmInbox" hidden>
           <div class="row" style="justify-content:space-between">
             <b id="dmWhoAmI"></b>
-            <button class="btn small ghost" type="button" id="dmLock">🔒 Lock</button>
+
           </div>
           <div id="dmPeople"></div>
           <p class="center"><small>Don't see someone? They show up here after they unlock direct messages once on their own device.</small></p>
@@ -598,18 +635,16 @@
     </div>
     <div class="panel center" id="familyPanel">
       <h2>👨‍👩‍👧 Family Sync</h2>
-      <p>Type your secret <b>family code</b> so all three of you share ONE planner. Everyone must use the exact same code!</p>
       <div id="familyJoin">
-        <div class="row">
-          <input id="familyCode" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Secret family code (6+ letters)" style="max-width:320px">
-          <button class="btn small ghost" id="familyPeekBtn" type="button">🙈 Hide</button>
-          <button class="btn green" id="familyJoinBtn">🔗 Connect</button>
-        </div>
-        <p><small>🤫 Don't post your code anywhere public. Anyone who knows it can change your planner.</small></p>
+        <p>Sign in with your <b>family code</b>, your <b>name</b> and your <b>PIN</b> so you all share ONE planner.</p>
+        <button class="btn green" type="button" id="signInBtn">🔑 Sign in</button>
+        <p><small>🤫 Don't post your family code or PIN anywhere public.</small></p>
       </div>
       <div id="familyConnected" hidden>
+        <p id="signedInAs" style="font-weight:bold;font-size:1.2rem"></p>
         <p id="familyStatus" style="font-weight:bold"></p>
-        <button class="btn small ghost" id="familyLeaveBtn">Disconnect this device</button>
+        <button class="btn small ghost" id="familyLeaveBtn">🚪 Sign out of this device</button>
+        <p><small>Signing out keeps a copy of the planner on this device, but stops sharing and hides your messages.</small></p>
       </div>
     </div>
     <div class="panel center">
@@ -1377,6 +1412,22 @@ async function callDb(fn, args) {
 
 function saveSyncState() { save("tes_synced_v1", synced); save("tes_last_pull", lastPull); }
 
+// The database hands objects back with their parts in a different ORDER ({b:1, a:2} instead of {a:2, b:1}).
+// canon() writes an object as text with its parts sorted A–Z, so the same thing always gives the same text.
+function canon(v) {
+  if (Array.isArray(v)) return "[" + v.map(canon).join(",") + "]";
+  if (v && typeof v === "object")
+    return "{" + Object.keys(v).filter(k => v[k] !== undefined).sort().map(k => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}";
+  return JSON.stringify(v);
+}
+// Is this item exactly what the family database already has? (also works for snapshots saved the old way)
+function isSynced(key, item) {
+  const now = canon(item);
+  if (synced[key] === now) return true;
+  if (synced[key] && canon(JSON.parse(synced[key])) === now) { synced[key] = now; return true; }
+  return false;
+}
+
 async function pushChanges() {
   if (!familyCode) return;
   if (pushing) { pushAgain = true; return; } // a push is already running; do one more after it
@@ -1387,10 +1438,10 @@ async function pushChanges() {
     KINDS.forEach(kind => getList(kind).forEach(item => {
       const key = kind + ":" + item.id;
       seen.add(key);
-      if (synced[key] === JSON.stringify(item)) return; // unchanged
-      // Remember WHO made this change, so siblings' "What's new" can say "Big Sis moved..."
+      if (isSynced(key, item)) return; // unchanged
+      // Remember WHO made this change, so siblings' "What's new" can say "Sam moved..."
       item.editedBy = myName() || "Someone";
-      changes.push({ kind, id: item.id, data: item, json: JSON.stringify(item), key });
+      changes.push({ kind, id: item.id, data: item, json: canon(item), key });
     }));
     Object.keys(synced).forEach(key => {
       if (!seen.has(key)) {
@@ -1436,10 +1487,9 @@ async function pullChanges() {
         }
         return;
       }
-      const json = JSON.stringify(row.data);
-      if (synced[key] === json) return; // we already have this exact version
+      if (isSynced(key, row.data)) return; // we already have this exact version
       describeChange(row.kind, i >= 0 ? list[i] : null, row.data);
-      synced[key] = json;
+      synced[key] = canon(row.data);
       if (i >= 0) list[i] = row.data; else list.push(row.data);
       changed = true;
     });
@@ -1471,7 +1521,7 @@ async function joinFamily(code) {
       if (r.updated_at > lastPull) lastPull = r.updated_at;
       if (r.deleted) return;
       server.push(r.data);
-      synced[kind + ":" + r.id] = JSON.stringify(r.data);
+      synced[kind + ":" + r.id] = canon(r.data);
     });
     // Keep local items the family doesn't have yet. Starter ideas match by
     // title + channel, because each device gave them different random ids.
@@ -1487,9 +1537,9 @@ async function joinFamily(code) {
 function setOnline(isOnline) { online = isOnline; renderSync(); }
 
 function renderSync() {
-  $("familyJoin").hidden = !!familyCode;
+  $("familyJoin").hidden = signedIn();          // show "🔑 Sign in" until you're fully signed in
   $("familyConnected").hidden = !familyCode;
-  const text = !familyCode ? "📴 Not sharing yet — tap to connect with your family"
+  const text = !familyCode ? "📴 Not signed in — tap to sign in with your family"
     : online ? "🟢 Sharing with your family" : "🟠 Can't reach the internet — changes will sync later";
   $("syncPill").textContent = text;
   $("familyStatus").textContent = text;
@@ -1497,37 +1547,16 @@ function renderSync() {
   if (typeof renderScoreboard === "function") renderScoreboard();
 }
 
-// Show or hide the code as you type ("password" type shows dots instead of letters)
-$("familyPeekBtn").addEventListener("click", () => {
-  const box = $("familyCode");
-  const hidden = box.type === "password";
-  box.type = hidden ? "text" : "password";
-  $("familyPeekBtn").textContent = hidden ? "🙈 Hide" : "👁️ Show";
-});
+// After joining a family: start everything fresh for the new family (chat, comments, votes...)
+function afterJoin() {
+  newsMsgId = null; newsCmtId = null; newsWinId = null; saveNewsIds();
+  wins = []; pullWins();
+  newsCustomId = null; pullCustoms();
+  resetChat(); pullMessages();
+  resetComments(); pullComments(); pullVotes();
+}
 
-$("familyJoinBtn").addEventListener("click", async () => {
-  const code = $("familyCode").value.trim();
-  if (code.length < 6) { showToast("🔑 The family code needs at least 6 letters."); return; }
-  $("familyJoinBtn").disabled = true;
-  try {
-    const isNew = await joinFamily(code);
-    $("familyCode").value = "";
-    newsMsgId = null; newsCmtId = null; newsWinId = null; saveNewsIds();
-    wins = []; pullWins();
-    dmSignOut(false);
-    newsCustomId = null; pullCustoms();
-    resetChat(); pullMessages();
-    resetComments(); pullComments(); pullVotes();
-    showToast(isNew ? "🎉 New family planner made! Give your siblings the same code."
-                    : "🔗 Connected! You're sharing the family planner.");
-  } catch (e) {
-    showToast("😕 Couldn't connect. Check your internet and try again.");
-  } finally {
-    $("familyJoinBtn").disabled = false;
-  }
-});
-
-$("familyLeaveBtn").addEventListener("click", e => twoTapDelete(e.currentTarget, "Disconnect this device", () => {
+$("familyLeaveBtn").addEventListener("click", e => twoTapDelete(e.currentTarget, "🚪 Sign out of this device", () => {
   // Stops sharing on THIS device only. Your local copy stays; the family planner is untouched.
   familyCode = null; synced = {}; lastPull = "1970-01-01T00:00:00Z";
   try { localStorage.removeItem("tes_family_code"); } catch (err) {}
@@ -1536,7 +1565,9 @@ $("familyLeaveBtn").addEventListener("click", e => twoTapDelete(e.currentTarget,
   wins = []; renderScoreboard();
   dmSignOut(false);
   customs = load("tes_customs_local", []); renderCustoms();
-  showToast("📴 Disconnected. This device keeps its own copy now.");
+  renderAccount();
+  showToast("🚪 Signed out. This device keeps its own copy of the planner.");
+  openWelcome();
 }));
 
 // Tapping the status line jumps to the Family Sync box
@@ -3300,24 +3331,7 @@ function markDmsSeen(name) {
   if (last && (dmSeen[lc(name)] || 0) < last.id) { dmSeen[lc(name)] = last.id; save("tes_dm_seen", dmSeen); }
 }
 
-$("dmLogin").addEventListener("submit", async e => {
-  e.preventDefault();
-  const name = $("dmNameInput").value.trim(), pin = $("dmPinInput").value.trim();
-  if (!name) { showToast("✏️ Type your name!"); return; }
-  if (!/^[0-9]{4,8}$/.test(pin)) { showToast("🔢 Your PIN needs to be 4 to 8 numbers."); return; }
-  try {
-    const result = await callDb("dm_login", { code: familyCode, name, pin });
-    if (result === "wrong_pin") { showToast("🙅 Wrong PIN for " + name + ". Try again!"); $("dmPinInput").value = ""; return; }
-    // Use the name exactly how it was first claimed (so "sam" and "Sam" are the same person)
-    const people = await callDb("dm_members", { code: familyCode });
-    const real = (people.find(p => lc(p.name) === lc(name)) || { name }).name;
-    dmMe = { name: real, pin }; save("tes_dm", dmMe);
-    $("dmPinInput").value = "";
-    newsDmId = null; dms = []; lastDmId = 0;
-    showToast(result === "created" ? "🎉 Name claimed! Remember your PIN!" : "🔓 Unlocked! Hi " + real + "!");
-    await pullDms();
-  } catch (err) { showToast("😕 Couldn't unlock. Check your internet and try again."); }
-});
+$("dmSignInBtn").addEventListener("click", () => openWelcome());
 
 function dmSignOut(showMessage = true) {
   dmMe = null; dms = []; lastDmId = 0; dmWith = null; dmPeople = []; newsDmId = null;
@@ -3326,7 +3340,7 @@ function dmSignOut(showMessage = true) {
   renderDms(); renderChatState();
   if (showMessage) showToast("🔒 Locked. Your messages are hidden on this device.");
 }
-$("dmLock").addEventListener("click", () => dmSignOut(true));
+
 
 async function pullDms() {
   if (!familyCode || !dmMe) return renderDms();
@@ -3355,7 +3369,7 @@ function renderDms() {
   $("dmLogin").hidden = unlocked;
   $("dmInbox").hidden = !unlocked || !!dmWith;
   $("dmThread").hidden = !unlocked || !dmWith;
-  if (!unlocked) { if (!$("dmNameInput").value) $("dmNameInput").value = myName(); return; }
+  if (!unlocked) return;
   $("dmWhoAmI").textContent = "✉️ Messages for " + dmMe.name;
   // The list of people, with the newest message and unread count
   $("dmPeople").replaceChildren(...(dmPeople.length ? dmPeople.map(name => {
@@ -3497,6 +3511,124 @@ $("customTwistForm").addEventListener("submit", e => {
   e.preventDefault(); addCustom("twist", $("customTwistText").value, $("customTwistChannel").value); $("customTwistText").value = "";
 });
 renderCustoms(); // draws the lists and the wheel
+
+/* ---------- 4ac. WELCOME / SIGN IN ----------
+   Signing in = family code + your name + your PIN, all in one place.
+   It uses the same name + PIN as direct messages (dm_login in the database),
+   so after signing in, sync, your name, and DMs all just work. */
+let wCode = "", wName = "", wIsNewPerson = false, wIsNewFamily = false;
+
+function signedIn() { return !!(familyCode && dmMe); }
+
+function showStep(n) {
+  $("wStep1").hidden = n !== 1; $("wStep2").hidden = n !== 2; $("wStep3").hidden = n !== 3;
+  const focus = { 1: "wCode", 2: "wNewName", 3: "wPin" }[n];
+  setTimeout(() => $(focus).focus(), 50);
+}
+
+function openWelcome() {
+  save("tes_skip_welcome", false);
+  $("welcome").hidden = false;
+  // Already connected to a family (from before sign-in existed)? Skip straight to "who are you?"
+  if (familyCode) { wCode = familyCode; wIsNewFamily = false; goStep2(); } else { $("wNewFamily").hidden = true; showStep(1); }
+}
+function closeWelcome() { $("welcome").hidden = true; }
+
+$("wSkip").addEventListener("click", () => {
+  save("tes_skip_welcome", true); closeWelcome();
+  showToast("👍 You can sign in any time in ⚙️ Settings.");
+});
+
+// Step 1: does a family with this code exist?
+$("wStep1").addEventListener("submit", async e => {
+  e.preventDefault();
+  wCode = $("wCode").value.trim();
+  if (wCode.length < 6) { showToast("🔑 The family code needs at least 6 letters."); return; }
+  try {
+    await callDb("get_channel_name", { code: wCode }); // this fails if no family has the code
+    wIsNewFamily = false; goStep2();
+  } catch (err) {
+    if (String(err).includes("Unknown family code")) $("wNewFamily").hidden = false; // ask before making a new one!
+    else showToast("😕 Couldn't check the code. Check your internet!");
+  }
+});
+$("wCreateFamily").addEventListener("click", () => { wIsNewFamily = true; goStep2(); });
+$("wCode").addEventListener("input", () => { $("wNewFamily").hidden = true; });
+
+// Step 2: pick your name, or add yourself
+async function goStep2() {
+  showStep(2);
+  $("wNewName").value = "";
+  let people = [];
+  if (!wIsNewFamily) {
+    try { people = (await callDb("dm_members", { code: wCode })).map(p => p.name); }
+    catch (err) { showToast("😕 Couldn't load the names. Check your internet!"); }
+  }
+  $("wNames").replaceChildren(...(people.length
+    ? people.map(name => el("button", { class: "btn purple w-name", type: "button", onclick: () => { wName = name; wIsNewPerson = false; goStep3(); } }, "🙋 " + name))
+    : [el("p", { class: "empty" }, wIsNewFamily ? "You're the first one here! Type your name below." : "Nobody has signed in yet. Type your name below!")]));
+  $("wNewName").placeholder = people.length ? "Not on the list? I'm new! My name is..." : "My name is...";
+  $("wNames").dataset.people = JSON.stringify(people);
+}
+$("wNewNameForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const name = $("wNewName").value.trim();
+  if (!name) { showToast("✏️ Type your name!"); return; }
+  const people = JSON.parse($("wNames").dataset.people || "[]");
+  const taken = people.find(p => lc(p) === lc(name));
+  if (taken) { showToast("👆 " + taken + " is already on the list — tap it instead!"); return; }
+  wName = name; wIsNewPerson = true; goStep3();
+});
+$("wBack1").addEventListener("click", () => { $("wNewFamily").hidden = true; $("wCode").value = wCode; showStep(1); });
+
+// Step 3: PIN
+function goStep3() {
+  $("wPin").value = "";
+  $("wPinPrompt").innerHTML = "";
+  $("wPinPrompt").append(wIsNewPerson
+    ? el("span", {}, el("b", {}, "Step 3: "), "Hi " + wName + "! Make up a secret PIN (4–8 numbers). Remember it — you'll need it on your other devices! 🤫")
+    : el("span", {}, el("b", {}, "Step 3: "), "Hi " + wName + "! Type your secret PIN."));
+  showStep(3);
+}
+$("wBack2").addEventListener("click", () => goStep2());
+
+$("wStep3").addEventListener("submit", async e => {
+  e.preventDefault();
+  const pin = $("wPin").value.trim();
+  if (!/^[0-9]{4,8}$/.test(pin)) { showToast("🔢 Your PIN needs to be 4 to 8 numbers."); return; }
+  try {
+    // 1) join the family (makes it if it's brand new, and mixes in what's on this device)
+    let isNew = false;
+    if (!myName()) setMyName(wName); // so anything saved while joining is stamped with your name, not "Someone"
+    if (familyCode !== wCode) { isNew = await joinFamily(wCode); afterJoin(); }
+    // 2) check the PIN (or claim the name, if you're new)
+    const result = await callDb("dm_login", { code: wCode, name: wName, pin });
+    if (result === "wrong_pin") { showToast("🙅 That's not " + wName + "'s PIN. Try again!"); $("wPin").value = ""; return; }
+    // 3) you're in!
+    const people = await callDb("dm_members", { code: wCode });
+    const real = (people.find(p => lc(p.name) === lc(wName)) || { name: wName }).name; // the name exactly as it was first claimed
+    dmMe = { name: real, pin }; save("tes_dm", dmMe);
+    newsDmId = null; dms = []; lastDmId = 0;
+    setMyName(real);
+    closeWelcome();
+    renderAccount(); pullDms();
+    showToast(isNew ? "🎉 New family planner made! Give your siblings the same family code."
+                    : "🔓 Signed in! Hi " + real + "!");
+  } catch (err) { showToast("😕 Couldn't sign in. Check your internet and try again."); }
+});
+
+// While signed in, your name comes from your sign-in, so lock the name boxes
+function renderAccount() {
+  const on = signedIn();
+  ["nameInput", "chatName", "commentName"].forEach(id => { $(id).readOnly = on; $(id).title = on ? "You're signed in as " + myName() : ""; });
+  $("nameForm").querySelector("button").hidden = on;
+  $("signedInAs").textContent = on ? "🙋 Signed in as " + dmMe.name : "";
+}
+$("signInBtn").addEventListener("click", () => openWelcome());
+
+renderAccount();
+// Show the welcome screen if you're not signed in (unless you chose "Skip")
+if (!signedIn() && !load("tes_skip_welcome", false)) openWelcome();
 
 /* ---------- Draw everything ---------- */
 function renderAll() {

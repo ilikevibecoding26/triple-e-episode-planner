@@ -52,13 +52,13 @@
 
 **📦 Share & Backup** (in ⚙️ Settings) — Export everything to a file as a backup, or import a file from a sibling.
 
-**👨‍👩‍👧 Family Sync** (in ⚙️ Settings) — Type your secret family code and press Connect. Everyone who uses the same code shares ONE planner, and changes show up on everyone's screen within a few seconds. This part needs the internet; if you're offline, changes wait and sync later. Keep the code secret!
+**🔑 Sign in** — The first time you open the app, the Welcome screen asks for 3 things: your **family code**, **who you are** (tap your name, or add yourself if you're new), and your secret **PIN** (4–8 numbers; make one up the first time). That's it — sync, your name and direct messages all work. Use the same code, name and PIN on your other devices. **🚪 Sign out** is in ⚙️ Settings. (Want to use the app without the family stuff? Tap *Skip*.)
 
 **💬 Card comments** (in the Planner) — Tap 💬 on any card to talk about just that episode. It turns pink with a number when a sibling left a comment you haven't read yet (your own comments don't count). Separate from the main chat!
 
 **💬 Chat** — Once you're connected with your family code, talk about what you're planning! Type your name once, then chat. A pink number on the Chat tab means new messages.
 
-**✉️ Direct messages** (in Chat) — Private messages between two people. The first time, type your name and make up a secret PIN (4–8 numbers). Only you and the person you're messaging can read them — even someone else with the family code can't. Press **🔒 Lock** on a shared device.
+**✉️ Direct messages** (in Chat) — Private messages between two people. Only you and the person you're messaging can read them — even someone else with the family code can't, because your PIN protects your name.
 
 **⚙️ Settings**
 - **📺 Channel name** — Change the name at the top of the app. If you're connected with your family code, everyone sees the new name.
