@@ -40,7 +40,7 @@
 
 **🎥 Shot list** (in each planner card) — the scenes to film, in order. Use the starter shots or add your own, move them with ▲ ▼, and tick them off as you film.
 
-**🤪 Idea Mashup** (on the Spin tab) — smoosh two ideas together or add a crazy twist, then send it to the Planner.
+**🤪 Idea Mashup** (on the Spin tab) — Makes a new idea from your bank: a **Double Challenge** (two short games in one video, most wins = champion) or a **twist** that fits that kind of video (like *Floor Is Lava Parkour, but no jumping allowed!*). It never mixes Gaming and Challenge ideas. Send it to the Planner if you like it.
 
 **📱 Home screen app** — In Safari tap Share ⬆️ → **Add to Home Screen** to get the planner as an app with its own icon.
 

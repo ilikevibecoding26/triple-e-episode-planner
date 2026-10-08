@@ -2737,28 +2737,78 @@ $("scriptDownload").addEventListener("click", () => {
 });
 
 /* ---------- 4t. IDEA MASHUP ----------
-   Two ways to make a brand-new idea:
-   1) glue two ideas together: "Boat Race + Floor Is Lava Parkour"
-   2) add a crazy twist to one idea: "Boat Race (but in Hardcore Mode!)" */
+   Two ways to make a brand-new idea (always from the SAME channel, so we never
+   mix real-life challenges with Minecraft ones):
+   1) a DOUBLE CHALLENGE: play two short ideas back to back, most wins = champion
+   2) a TWIST on one idea — but only twists that make sense for that kind of video
+      (we use videoKind() from the script maker to tell what kind it is). */
+// "kinds" = which kinds of video the twist works for ("all" = any of them)
+// "kinds" = which kinds of video the twist works for ("all" = any of them)
+// "avoid" = skip the twist if the idea already has it (no "Swap Builds Halfway, but we swap builds halfway!")
+const HAS_A_WINNER = ["build", "battle", "race", "contest", "guessing", "show-off", "hide and seek", "try not to laugh", "survival", "challenge"]; // every kind except "day" (those don't have a winner)
 const TWISTS = {
-  Challenge: ["but BLINDFOLDED", "but in the DARK", "but the youngest is in charge", "in only 60 seconds",
-              "but nobody can talk", "with the punishment wheel", "but everything is backwards", "but in slow motion"],
-  Gaming:    ["but in Hardcore Mode", "but with only one block type", "but we swap halfway", "in 10 minutes",
-              "but whatever we mine we must use", "on a one-block island", "but no jumping allowed", "but in the Nether"]
+  Challenge: [
+    { text: "but BLINDFOLDED", kinds: ["race", "guessing", "contest", "show-off", "challenge"], avoid: /blindfold/ },
+    { text: "but in the DARK with flashlights", kinds: ["hide and seek", "guessing", "try not to laugh"], avoid: /dark|lights off|flashlight/ },
+    { text: "but the youngest is the judge", kinds: HAS_A_WINNER, avoid: /youngest/ },
+    { text: "but nobody can talk", kinds: ["race", "build", "contest", "show-off", "try not to laugh", "challenge"], avoid: /whisper|banned word|talk/ },
+    { text: "with the punishment wheel after every round", kinds: HAS_A_WINNER },
+    { text: "but in slow motion", kinds: ["race", "show-off", "contest"] },
+    { text: "but you have to hop on one foot", kinds: ["race", "contest", "show-off"] },
+    { text: "in only 60 seconds", kinds: ["build", "guessing", "show-off", "contest"], avoid: /seconds|minute|timed/ },
+    { text: "but a parent gets to play too", kinds: "all", avoid: /parent/ }
+  ],
+  Gaming: [
+    { text: "but in Hardcore Mode", kinds: ["survival", "race", "battle", "challenge"], avoid: /hardcore/ },
+    { text: "but with only one block type", kinds: ["build"], avoid: /one block|one type/ },
+    { text: "but we swap builds halfway", kinds: ["build"], avoid: /swap|relay/ },
+    { text: "in only 10 minutes", kinds: ["build", "contest", "race", "guessing"], avoid: /seconds|minute|timed|speed/ },
+    { text: "but no jumping allowed", kinds: ["race", "battle", "hide and seek"], avoid: /jump/ },
+    { text: "on a one-block island", kinds: ["build", "survival"], avoid: /island|one block/ },
+    { text: "but the comments pick the winner", kinds: HAS_A_WINNER, avoid: /comment/ },
+    { text: "but everyone has to wear leather armor", kinds: ["battle", "survival"], avoid: /armor|gear/ },
+    { text: "but we can only use what's in one chest", kinds: ["build", "survival", "battle"], avoid: /whatever we mine|chest/ },
+    { text: "but a parent joins our world", kinds: "all", avoid: /parent/ }
+  ]
 };
+// Big, long videos that are too much to squish together with another one
+const TOO_BIG_TO_COMBINE = /series|100 days|escape room|for a day|a day\b|in charge|world|theme park|recreate|surviv|hardcore|one block, three/i;
 let currentMash = null;
 
-function makeMashup() {
-  const channel = chosenChannel(); // uses the same channel picker as the big Spin button
-  const pool = ideas.filter(i => !i.used && (channel === "Any" || i.channel === channel));
-  if (pool.length < 2) { showToast("😕 Not enough ideas to mash up! Add some in the Idea Bank."); return; }
+function makeMashup(tries = 0) {
+  if (tries > 20) { showToast("😕 Couldn't make a mashup. Try a different channel!"); return; }
+  // "Surprise me" picks ONE channel first, so both ideas match
+  let channel = chosenChannel();
+  if (channel === "Any") channel = Math.random() < 0.5 ? "Gaming" : "Challenge";
+  const pool = ideas.filter(i => !i.used && i.channel === channel);
+  if (!pool.length) { showToast("😕 No " + channel + " ideas left to mash up! Add some in the Idea Bank."); return; }
+  // Twists that fit an idea: right kind of video, and the idea doesn't already have it
+  const twistsFor = idea => {
+    const kind = videoKind(idea.title, idea.desc).name, text = (idea.title + " " + idea.desc).toLowerCase();
+    return (TWISTS[channel] || TWISTS.Challenge).filter(t => (t.kinds === "all" || t.kinds.includes(kind)) && !(t.avoid && t.avoid.test(text)));
+  };
   const a = pick(pool);
-  if (Math.random() < 0.5) {
-    const b = pick(pool.filter(i => i.id !== a.id));
-    currentMash = { title: a.title + " + " + b.title, channel: a.channel, desc: a.desc + " PLUS: " + b.desc };
+  const kindA = videoKind(a.title, a.desc).name;
+  // Ideas that are small enough to play two in one video
+  const combinable = pool.filter(i => !TOO_BIG_TO_COMBINE.test(i.title + " " + i.desc));
+  const partners = combinable.filter(i => i.id !== a.id && videoKind(i.title, i.desc).name !== kindA); // different kinds = more fun
+  const canCombine = combinable.includes(a) && partners.length > 0;
+
+  const fits = twistsFor(a);
+  // Double Challenge sometimes, or always if no twist fits this idea
+  if (canCombine && (Math.random() < 0.45 || !fits.length)) {
+    const b = pick(partners);
+    currentMash = {
+      title: a.title + " + " + b.title + " (Double Challenge!)",
+      channel,
+      desc: "Two games in one video! Part 1: " + a.title + " — " + a.desc + " Part 2: " + b.title + " — " + b.desc +
+            " Whoever wins the most parts is the champion!"
+    };
+  } else if (fits.length) {
+    const twist = pick(fits).text;
+    currentMash = { title: a.title + " (" + twist + "!)", channel, desc: a.desc + " Twist: " + twist + "!" };
   } else {
-    const twist = pick(TWISTS[a.channel] || TWISTS.Challenge);
-    currentMash = { title: a.title + " (" + twist + "!)", channel: a.channel, desc: a.desc + " Twist: " + twist + "!" };
+    return makeMashup(tries + 1); // (super rare) nothing works for this idea, so try a different one
   }
   const card = $("mashCard");
   card.hidden = false;
@@ -2766,8 +2816,8 @@ function makeMashup() {
   card.classList.remove("pop"); void card.offsetWidth; card.classList.add("pop");
   $("mashActions").hidden = false;
 }
-$("mashBtn").addEventListener("click", makeMashup);
-$("mashAgainBtn").addEventListener("click", makeMashup);
+$("mashBtn").addEventListener("click", () => makeMashup());
+$("mashAgainBtn").addEventListener("click", () => makeMashup());
 $("mashSendBtn").addEventListener("click", () => { if (currentMash) addEpisode({ ...currentMash }); });
 
 /* ---------- 4u. CALENDAR VIEW ----------
