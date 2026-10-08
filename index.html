@@ -171,6 +171,7 @@
   html.no-emoji #chatList:empty::before { content: "No messages yet — be the first to say hi!"; }
   html.no-emoji #commentList:empty::before { content: "No comments yet — what do you think of this idea?"; }
   /* ---- Dates, jobs, checklist, votes ---- */
+  .ep.archived { opacity: .55; border-style: dashed; }
   .ep .meta { font-size: .78rem; margin: 2px 0 6px; display: flex; flex-wrap: wrap; gap: 2px 10px; }
   .late { color: #ef4444; font-weight: bold; }
   html.dark .late { color: #fb7185; }
@@ -252,6 +253,13 @@
                border: 3px solid var(--ink); border-radius: 14px; background: var(--card-alt); color: var(--ink); cursor: pointer; font: inherit; }
   .dm-person .who { font-weight: bold; }
   .dm-person .preview { flex: 1; opacity: .7; font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* ---- Our punishments / twists ---- */
+  .custom-box { margin-top: 14px; text-align: left; border: 3px dashed var(--ink); border-radius: 16px; padding: 10px 14px; }
+  .custom-box summary { cursor: pointer; font-weight: bold; text-align: center; }
+  .custom-list { list-style: none; padding: 0; }
+  .custom-list li { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 2px dashed var(--purple-soft); }
+  .custom-list li span { flex: 1; }
+  .custom-list .tag { flex: none; font-size: .75rem; opacity: .7; }
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, calc(100% + 40px)); opacity: 0; z-index: 10;
     background: var(--gaming); color: white; font-weight: bold; padding: 14px 22px;
@@ -313,6 +321,16 @@
       <p>Smoosh two ideas together, or add a crazy twist!</p>
       <p><button class="btn big purple" id="mashBtn">🤪 Mash up ideas!</button></p>
       <div id="mashCard" class="idea-big" hidden></div>
+      <details class="custom-box">
+        <summary>✏️ Our twists</summary>
+        <ul id="customTwistList" class="custom-list"></ul>
+        <form id="customTwistForm" class="row">
+          <input id="customTwistText" maxlength="80" placeholder="e.g. but in pajamas" style="flex:2 1 200px;width:auto;min-width:0">
+          <select id="customTwistChannel" style="width:auto"><option>Both</option><option>Gaming</option><option>Challenge</option></select>
+          <button class="btn small green" type="submit">Add</button>
+        </form>
+        <p><small id="customTwistNote"></small></p>
+      </details>
       <div class="row" id="mashActions" hidden>
         <button class="btn orange" id="mashAgainBtn">🔄 Another mashup!</button>
         <button class="btn green" id="mashSendBtn">📋 Send to Planner</button>
@@ -395,6 +413,7 @@
     <div class="row" style="justify-content:flex-start;margin-bottom:10px">
       <button class="btn small" type="button" id="viewBoardBtn">📋 Board</button>
       <button class="btn small ghost" type="button" id="viewCalBtn">🗓️ Calendar</button>
+      <button class="btn small ghost" type="button" id="showArchivedBtn">📦 Show archived</button>
     </div>
     <div id="board"></div>
     <div id="calendar" class="panel" hidden></div>
@@ -616,6 +635,16 @@
       </div>
       <div id="punishBox">Who lost? Spin the wheel!</div>
       <button class="btn big orange" id="punishBtn">🎡 Spin the wheel!</button>
+      <details class="custom-box">
+        <summary>✏️ Our punishments</summary>
+        <label class="check-item" style="justify-content:center"><input type="checkbox" id="useStarterPunish" checked> <span style="flex:none">Include the starter punishments</span></label>
+        <ul id="customPunishList" class="custom-list"></ul>
+        <form id="customPunishForm" class="row" style="flex-wrap:nowrap">
+          <input id="customPunishText" maxlength="80" placeholder="e.g. Talk like a pirate for 5 minutes">
+          <button class="btn small green" type="submit">Add</button>
+        </form>
+        <p><small id="customPunishNote"></small></p>
+      </details>
     </div>
     <div class="panel center">
       <h2>📝 Title Helper</h2>
@@ -669,6 +698,7 @@
     <p class="row">
       <button class="btn green" type="submit">💾 Save</button>
       <button class="btn ghost" type="button" id="epCancel">Cancel</button>
+      <button class="btn purple" type="button" id="epArchive">📦 Archive</button>
       <button class="btn orange" type="button" id="epDelete">🗑️ Delete</button>
     </p>
   </form>
@@ -1126,6 +1156,7 @@ function renderBoard() {
   $("viewBoardBtn").className = "btn small" + (planView === "calendar" ? " ghost" : "");
   $("viewCalBtn").className = "btn small" + (planView === "calendar" ? "" : " ghost");
   if (planView === "calendar") renderCalendar();
+  renderArchiveButton();
   $("board").replaceChildren(...STAGES.map(stage => {
     const col = el("div", { class: "col", "data-stage": stage }, el("h3", {}, stage));
     const mine = byVotes(visibleEpisodes().filter(e => e.status === stage)); // most votes at the top
@@ -1144,7 +1175,7 @@ function renderBoard() {
     });
 
     mine.forEach(ep => {
-      const card = el("div", { class: "ep accent-" + ep.channel, draggable: "true" },
+      const card = el("div", { class: "ep accent-" + ep.channel + (ep.archived ? " archived" : ""), draggable: "true" },
         // little trash can in the top-right corner (tap twice to delete)
         el("button", { class: "btn small orange", style: "float:right", title: "Delete card",
           onclick: e => twoTapDelete(e.currentTarget, "🗑️", () => deleteEpisode(ep.id)) }, "🗑️"),
@@ -1159,7 +1190,11 @@ function renderBoard() {
           el("button", { class: "btn small ghost", title: "Edit", onclick: () => openEpisode(ep) }, "✏️"),
           // the 💬 button turns pink with a number when a sibling left a comment you haven't read
           el("button", { class: "btn small " + (unreadComments(ep.id) ? "" : "ghost"), title: "Comments", onclick: () => openEpisode(ep, true) }, (emojisOn ? "💬" : "Comments") + commentCountLabel(ep.id)),
-          el("button", { class: "btn small green", onclick: () => shift(ep, +1) }, "▶")
+          ep.archived
+            ? el("button", { class: "btn small purple", title: "Unarchive", onclick: () => setArchived(ep, false) }, ico("📤", "Unarchive"))
+            : ep.status === "Posted"
+              ? el("button", { class: "btn small purple", title: "Archive", onclick: () => setArchived(ep, true) }, "📦")
+              : el("button", { class: "btn small green", onclick: () => shift(ep, +1) }, "▶")
         ));
       card.addEventListener("dragstart", e => e.dataTransfer.setData("text/plain", ep.id));
       col.append(card);
@@ -1199,6 +1234,8 @@ function openEpisode(ep, jumpToComments = false) {
   renderChecklist();
   renderShots();
   $("epDelete").hidden = !ep;
+  $("epArchive").hidden = !ep;
+  $("epArchive").textContent = ep && ep.archived ? "📤 Unarchive" : "📦 Archive";
   renderComments();
   if (ep) markCommentsSeen(ep.id);
   $("epDialog").showModal();
@@ -1478,6 +1515,7 @@ $("familyJoinBtn").addEventListener("click", async () => {
     newsMsgId = null; newsCmtId = null; newsWinId = null; saveNewsIds();
     wins = []; pullWins();
     dmSignOut(false);
+    newsCustomId = null; pullCustoms();
     resetChat(); pullMessages();
     resetComments(); pullComments(); pullVotes();
     showToast(isNew ? "🎉 New family planner made! Give your siblings the same code."
@@ -1497,6 +1535,7 @@ $("familyLeaveBtn").addEventListener("click", e => twoTapDelete(e.currentTarget,
   votesByItem = {}; renderBank(); renderShorts(); renderBoard();
   wins = []; renderScoreboard();
   dmSignOut(false);
+  customs = load("tes_customs_local", []); renderCustoms();
   showToast("📴 Disconnected. This device keeps its own copy now.");
 }));
 
@@ -1676,7 +1715,7 @@ $("commentForm").addEventListener("submit", async e => {
 });
 
 // Check for siblings' changes (and new messages) every 5 seconds, and right away when you come back
-setInterval(() => { pushChanges(); pullChanges(); pullMessages(); pullComments(); pullChannelName(); pullVotes(); pullWins(); pullDms(); }, 5000);
+setInterval(() => { pushChanges(); pullChanges(); pullMessages(); pullComments(); pullChannelName(); pullVotes(); pullWins(); pullDms(); pullCustoms(); }, 5000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { pullChanges(); pullMessages(); pullComments(); } });
 
 /* ---------- 4i. SETTINGS: EMOJI ON/OFF ----------
@@ -1889,8 +1928,10 @@ $("jobWho").addEventListener("keydown", e => { if (e.key === "Enter") { e.preven
 
 // Which cards to show on the board
 function visibleEpisodes() {
-  if (boardWho === "Everyone") return episodes;
-  return episodes.filter(ep => (ep.jobs || []).some(j => j.who === boardWho));
+  // Archived cards are hidden unless "📦 Show archived" is on
+  const list = showArchived ? episodes : episodes.filter(ep => !ep.archived);
+  if (boardWho === "Everyone") return list;
+  return list.filter(ep => (ep.jobs || []).some(j => j.who === boardWho));
 }
 
 function renderFilterNote() {
@@ -2120,7 +2161,14 @@ function newsFromComments(fresh) {
    then spin the whole canvas with a CSS rotation. The ▼ pointer stays still at the top.
    Angles: 0° is the top, going clockwise. Each slice gets 360° ÷ 12 = 30°. */
 const WHEEL_COLORS = ["#ec4899", "#7c3aed", "#f97316", "#16a34a", "#2563eb", "#dc2626"];
-const SLICE = 360 / PUNISHMENTS.length;
+// The wheel's slices: the starter punishments (if turned on) + your own
+function wheelItems() {
+  const starters = useStarterPunish ? PUNISHMENTS.map((text, i) => ({ text, label: PUNISHMENT_LABELS[i] })) : [];
+  const ours = customs.filter(c => c.kind === "punishment").map(c => ({ text: c.text, label: shorten(c.text, 20) }));
+  const all = [...starters, ...ours];
+  return all.length ? all : PUNISHMENTS.map((text, i) => ({ text, label: PUNISHMENT_LABELS[i] })); // never an empty wheel
+}
+function sliceSize() { return 360 / wheelItems().length; }
 let wheelTurn = 0;      // how far the wheel has turned in total (degrees)
 let wheelSpinning = false;
 
@@ -2128,7 +2176,8 @@ function drawWheel() {
   const canvas = $("wheel"), ctx = canvas.getContext("2d");
   const size = canvas.width, mid = size / 2, radius = mid - 4;
   ctx.clearRect(0, 0, size, size);
-  PUNISHMENT_LABELS.forEach((label, i) => {
+  const SLICE = sliceSize();
+  wheelItems().forEach(({ label }, i) => {
     // Canvas measures angles from the right side (3 o'clock), so subtract 90° to start at the top
     const start = (i * SLICE - 90) * Math.PI / 180, end = ((i + 1) * SLICE - 90) * Math.PI / 180;
     ctx.beginPath(); ctx.moveTo(mid, mid); ctx.arc(mid, mid, radius, start, end); ctx.closePath();
@@ -2143,7 +2192,7 @@ function drawWheel() {
     const room = radius - 22 - 50;
     let fontSize = 32;
     do { ctx.font = "bold " + fontSize + "px 'Comic Sans MS', 'Chalkboard SE', sans-serif"; fontSize -= 2; }
-    while (ctx.measureText(label).width > room && fontSize > 16);
+    while (ctx.measureText(label).width > room && fontSize > 12);
     ctx.fillText(label, radius - 22, 0, room);
     ctx.restore();
   });
@@ -2157,7 +2206,8 @@ $("punishBtn").addEventListener("click", () => {
   wheelSpinning = true;
   $("punishBox").textContent = "Spinning... 🥁";
   // Pick the winner first, then work out how far to turn so it stops under the pointer
-  const winner = Math.floor(Math.random() * PUNISHMENTS.length);
+  const items = wheelItems(), SLICE = sliceSize();
+  const winner = Math.floor(Math.random() * items.length);
   const sliceMiddle = winner * SLICE + SLICE / 2;
   const wobble = (Math.random() - 0.5) * SLICE * 0.6; // land somewhere inside the slice, not dead center
   const extraSpins = 5 + Math.floor(Math.random() * 3); // 5–7 full turns for drama
@@ -2169,13 +2219,12 @@ $("punishBtn").addEventListener("click", () => {
   wheel.style.transition = slow ? "transform 4.5s cubic-bezier(0.15, 0.85, 0.25, 1)" : "transform 0.6s ease-out";
   wheel.style.transform = "rotate(" + wheelTurn + "deg)";
   setTimeout(() => {
-    $("punishBox").textContent = "😈 " + PUNISHMENTS[winner] + "!";
+    $("punishBox").textContent = "😈 " + items[winner].text.replace(/!$/, "") + "!";
     wheelSpinning = false;
   }, slow ? 4600 : 700);
 });
 
-drawWheel();
-renderNews();
+renderNews(); // (the wheel gets drawn later, once "our punishments" are loaded — see renderCustoms)
 
 /* ---------- 4s. THUMBNAIL MAKER ----------
    We draw a YouTube-size picture (1280 x 720) on a <canvas> with code.
@@ -2649,7 +2698,7 @@ function makeScript(seed) {
   const title = $("epTitle").value.trim() || "Our New Video";
   const desc = $("epDesc").value.trim();
   const hook = $("epHook").value.trim();
-  const punishment = $("epPunish").value.trim() || pickR(PUNISHMENTS);
+  const punishment = $("epPunish").value.trim() || pickR(wheelItems().map(w => w.text));
   const kind = videoKind(title, desc);
   const forChannel = x => Array.isArray(x) ? x : (x[channel] || x.Challenge); // some lists are different for Gaming / Challenge
   const parts = descParts(desc);
@@ -2850,7 +2899,11 @@ function makeMashup(tries = 0) {
   // Twists that fit an idea: right kind of video, and the idea doesn't already have it
   const twistsFor = idea => {
     const kind = videoKind(idea.title, idea.desc).name, text = (idea.title + " " + idea.desc).toLowerCase();
-    return (TWISTS[channel] || TWISTS.Challenge).filter(t => (t.kinds === "all" || t.kinds.includes(kind)) && !(t.avoid && t.avoid.test(text)));
+    const ours = customs.filter(c => c.kind === "twist" && (c.channel === "Both" || c.channel === channel))
+      .map(c => ({ text: c.text, kinds: "all" }))
+      .filter(t => !text.includes(t.text.replace(/^(but|with|in|on|without) /i, "").toLowerCase())); // skip if the idea already has it
+    return [...(TWISTS[channel] || TWISTS.Challenge), ...ours]
+      .filter(t => (t.kinds === "all" || t.kinds.includes(kind)) && !(t.avoid && t.avoid.test(text)));
   };
   const a = pick(pool);
   const kindA = videoKind(a.title, a.desc).name;
@@ -3339,6 +3392,104 @@ $("dmForm").addEventListener("submit", async e => {
   } catch (err) { showToast("😕 Message didn't send. Check your internet!"); }
 });
 
+/* ---------- 4aa. ARCHIVE ----------
+   Archiving just sets archived: true on the card (it syncs like everything else).
+   Archived cards are hidden from the board, calendar and Coming up until you press "Show archived". */
+let showArchived = load("tes_show_archived", false);
+
+function setArchived(ep, yes) {
+  ep.archived = yes;
+  saveAll();
+  showToast(yes ? "📦 Archived \"" + ep.title + "\"! Press 📦 Show archived to see it again." : "📤 \"" + ep.title + "\" is back on the board!");
+}
+$("epArchive").addEventListener("click", () => {
+  const ep = openCard(); if (!ep) return;
+  $("epDialog").close();
+  setArchived(ep, !ep.archived);
+});
+function renderArchiveButton() {
+  const n = episodes.filter(ep => ep.archived).length;
+  $("showArchivedBtn").className = "btn small" + (showArchived ? "" : " ghost");
+  $("showArchivedBtn").textContent = (showArchived ? "📦 Hide archived" : "📦 Show archived") + (n ? " (" + n + ")" : "");
+}
+$("showArchivedBtn").addEventListener("click", () => {
+  showArchived = !showArchived; save("tes_show_archived", showArchived); renderBoard();
+});
+
+/* ---------- 4ab. OUR PUNISHMENTS + TWISTS ----------
+   When you're connected, they're saved in the family database so everyone shares them.
+   When you're not connected, they're saved just on this device. */
+let customs = load("tes_customs_local", []);  // [{ id, kind: "punishment" | "twist", text, channel, added_by }]
+let useStarterPunish = load("tes_starter_punish", true);
+let newsCustomId = load("tes_news_custom", null);
+$("useStarterPunish").checked = useStarterPunish;
+$("useStarterPunish").addEventListener("change", () => {
+  useStarterPunish = $("useStarterPunish").checked; save("tes_starter_punish", useStarterPunish); renderCustoms();
+});
+
+async function pullCustoms() {
+  if (!familyCode) return renderCustoms();
+  try {
+    const rows = await callDb("get_customs", { code: familyCode });
+    // What's new: ones someone else added
+    const newest = rows.length ? rows[rows.length - 1].id : 0;
+    if (newsCustomId === null) newsCustomId = newest;
+    rows.filter(c => c.id > newsCustomId && lc(c.added_by) !== lc(myName())).forEach(c =>
+      addNews((c.kind === "punishment" ? "🎡 " : "🤪 ") + (c.added_by || "Someone") + " added a " + c.kind + ": " + quote(c.text)));
+    newsCustomId = Math.max(newsCustomId, newest); save("tes_news_custom", newsCustomId);
+    if (JSON.stringify(rows) === JSON.stringify(customs)) return;
+    customs = rows;
+    renderCustoms();
+  } catch (e) { /* offline: try later */ }
+}
+
+function renderCustoms() {
+  const row = c => el("li", {},
+    el("span", {}, c.text),
+    c.kind === "twist" ? el("span", { class: "tag" }, c.channel) : "",
+    el("button", { class: "btn small ghost", type: "button", title: "Delete", onclick: e => twoTapDelete(e.currentTarget, "✕", () => removeCustom(c)) }, "✕"));
+  const punish = customs.filter(c => c.kind === "punishment"), twists = customs.filter(c => c.kind === "twist");
+  $("customPunishList").replaceChildren(...punish.map(row));
+  $("customTwistList").replaceChildren(...twists.map(row));
+  const where = familyCode ? "Shared with your family." : "Saved on this device only (connect your family code in ⚙️ Settings to share).";
+  $("customPunishNote").textContent = (punish.length ? "" : "No punishments of your own yet! ") + where +
+    " The wheel has " + wheelItems().length + " slices.";
+  $("customTwistNote").textContent = (twists.length ? "" : "No twists of your own yet! ") + where +
+    " Tip: start with \"but\" or \"with\", like \"but in pajamas\".";
+  drawWheel();
+}
+
+async function addCustom(kind, text, channel) {
+  text = text.trim().replace(/!+$/, "");
+  if (!text) return;
+  if (kind === "twist" && !/^(but|with|in|on|without|while)\b/i.test(text)) text = "but " + text; // "in pajamas" -> "but in pajamas"
+  if (customs.some(c => c.kind === kind && c.text.toLowerCase() === text.toLowerCase())) { showToast("😄 That one's already on the list!"); return; }
+  if (familyCode) {
+    try { await callDb("add_custom", { code: familyCode, kind, text, channel, added_by: myName() }); await pullCustoms(); }
+    catch (e) { showToast("😕 Couldn't save it. Check your internet!"); return; }
+  } else {
+    customs.push({ id: "local-" + newId(), kind, text, channel, added_by: myName() });
+    save("tes_customs_local", customs); renderCustoms();
+  }
+  showToast((kind === "punishment" ? "🎡 Added to the wheel: " : "🤪 New twist: ") + text);
+}
+
+async function removeCustom(c) {
+  if (String(c.id).startsWith("local-")) {
+    customs = customs.filter(x => x.id !== c.id); save("tes_customs_local", customs); renderCustoms(); return;
+  }
+  try { await callDb("delete_custom", { code: familyCode, custom_id: c.id }); customs = customs.filter(x => x.id !== c.id); renderCustoms(); }
+  catch (e) { showToast("😕 Couldn't delete it. Check your internet!"); }
+}
+
+$("customPunishForm").addEventListener("submit", e => {
+  e.preventDefault(); addCustom("punishment", $("customPunishText").value, "Both"); $("customPunishText").value = "";
+});
+$("customTwistForm").addEventListener("submit", e => {
+  e.preventDefault(); addCustom("twist", $("customTwistText").value, $("customTwistChannel").value); $("customTwistText").value = "";
+});
+renderCustoms(); // draws the lists and the wheel
+
 /* ---------- Draw everything ---------- */
 function renderAll() {
   renderStats(); renderBank(); renderShorts(); renderBoard();
@@ -3365,6 +3516,7 @@ pullChannelName();
 pullVotes();
 pullWins();
 pullDms();
+pullCustoms();
 </script>
 </body>
 </html>
