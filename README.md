@@ -54,6 +54,8 @@
 
 **💬 Chat** — Once you're connected with your family code, talk about what you're planning! Type your name once, then chat. A pink number on the Chat tab means new messages.
 
+**✉️ Direct messages** (in Chat) — Private messages between two people. The first time, type your name and make up a secret PIN (4–8 numbers). Only you and the person you're messaging can read them — even someone else with the family code can't. Press **🔒 Lock** on a shared device.
+
 **⚙️ Settings**
 - **📺 Channel name** — Change the name at the top of the app. If you're connected with your family code, everyone sees the new name.
 - **👤 Your name** — Used for chat, comments, votes and jobs.

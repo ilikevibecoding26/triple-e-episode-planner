@@ -243,6 +243,15 @@
   #shotItems .check-item { padding: 0; }
   #shotItems .check-item button { opacity: .6; }
   #scriptText { font-family: ui-monospace, Menlo, monospace; font-size: .85rem; line-height: 1.45; min-height: 50vh; }
+  /* ---- Direct messages ---- */
+  #dmList { height: 50vh; min-height: 240px; overflow-y: auto; border: 3px solid var(--ink); border-radius: 16px; padding: 10px; background: var(--purple-soft); }
+  #dmList:empty { height: auto; min-height: 120px; display: flex; align-items: center; justify-content: center; }
+  #dmList:empty::before { content: "No messages yet — say hi! 👋"; font-weight: bold; opacity: .6; }
+  html.no-emoji #dmList:empty::before { content: "No messages yet — say hi!"; }
+  .dm-person { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; margin: 6px 0; padding: 10px 14px;
+               border: 3px solid var(--ink); border-radius: 14px; background: var(--card-alt); color: var(--ink); cursor: pointer; font: inherit; }
+  .dm-person .who { font-weight: bold; }
+  .dm-person .preview { flex: 1; opacity: .7; font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #toast {
     position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, calc(100% + 40px)); opacity: 0; z-index: 10;
     background: var(--gaming); color: white; font-weight: bold; padding: 14px 22px;
@@ -453,10 +462,52 @@
   <!-- ===================== CHAT ===================== -->
   <section class="page" id="page-chat">
     <div class="panel">
-      <h2 class="center" style="margin-top:0">💬 Family Chat</h2>
+      <h2 class="center" style="margin-top:0">💬 Chat</h2>
       <div id="chatOff" class="empty">
         Connect with your family code first (⚙️ Settings → 👨‍👩‍👧 Family Sync), then you can chat here!
       </div>
+      <div class="row" id="chatViews" hidden style="margin-bottom:12px">
+        <button class="btn small" type="button" id="viewFamilyChat">👨‍👩‍👧 Family chat <span id="familyChatBadge" class="badge" hidden></span></button>
+        <button class="btn small ghost" type="button" id="viewDms">✉️ Direct messages <span id="dmBadge" class="badge" hidden></span></button>
+      </div>
+
+      <!-- ✉️ DIRECT MESSAGES -->
+      <div id="dmView" hidden>
+        <!-- Step 1: unlock with your name + secret PIN -->
+        <form id="dmLogin" class="center">
+          <p><b>Direct messages are private.</b> Only you and the person you're messaging can read them.</p>
+          <p><small>First time? Type your name and <b>make up</b> a secret PIN (4–8 numbers). Next time, use the same PIN.
+            Don't tell anyone your PIN!</small></p>
+          <div class="row">
+            <input id="dmNameInput" maxlength="30" placeholder="Your name" style="max-width:200px">
+            <input id="dmPinInput" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="Secret PIN" style="max-width:150px">
+            <button class="btn green" type="submit">🔓 Unlock</button>
+          </div>
+        </form>
+        <!-- Step 2: pick who to talk to -->
+        <div id="dmInbox" hidden>
+          <div class="row" style="justify-content:space-between">
+            <b id="dmWhoAmI"></b>
+            <button class="btn small ghost" type="button" id="dmLock">🔒 Lock</button>
+          </div>
+          <div id="dmPeople"></div>
+          <p class="center"><small>Don't see someone? They show up here after they unlock direct messages once on their own device.</small></p>
+        </div>
+        <!-- Step 3: one conversation -->
+        <div id="dmThread" hidden>
+          <div class="row" style="justify-content:space-between;margin-bottom:8px">
+            <button class="btn small ghost" type="button" id="dmBack">← Back</button>
+            <b id="dmThreadTitle"></b>
+            <span></span>
+          </div>
+          <div id="dmList" class="chat-box"></div>
+          <form id="dmForm" class="row" style="margin-top:10px;flex-wrap:nowrap">
+            <input id="dmText" maxlength="500" autocomplete="off" placeholder="Write a private message...">
+            <button class="btn green" type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+
       <div id="chatOn" hidden>
         <div class="row" style="justify-content:flex-start;margin-bottom:10px">
           <label for="chatName" style="margin:0">Your name:</label>
@@ -1426,6 +1477,7 @@ $("familyJoinBtn").addEventListener("click", async () => {
     $("familyCode").value = "";
     newsMsgId = null; newsCmtId = null; newsWinId = null; saveNewsIds();
     wins = []; pullWins();
+    dmSignOut(false);
     resetChat(); pullMessages();
     resetComments(); pullComments(); pullVotes();
     showToast(isNew ? "🎉 New family planner made! Give your siblings the same code."
@@ -1444,6 +1496,7 @@ $("familyLeaveBtn").addEventListener("click", e => twoTapDelete(e.currentTarget,
   saveSyncState(); renderSync(); resetChat(); resetComments();
   votesByItem = {}; renderBank(); renderShorts(); renderBoard();
   wins = []; renderScoreboard();
+  dmSignOut(false);
   showToast("📴 Disconnected. This device keeps its own copy now.");
 }));
 
@@ -1458,12 +1511,13 @@ $("syncPill").addEventListener("click", () => {
    Every message has a number (id) that goes up by 1 each time, so we just ask
    "any messages with a number bigger than the last one we saw?" */
 let lastMsgId = 0;
+let chatView = load("tes_chat_view", "family"); // "family" or "dms"
 let unread = 0;
 let chatName = load("tes_chat_name", "");
 $("chatName").value = chatName;
 $("chatName").addEventListener("change", () => { chatName = $("chatName").value.trim(); save("tes_chat_name", chatName); });
 
-function chatIsOpen() { return $("page-chat").classList.contains("active") && !document.hidden; }
+function chatIsOpen() { return $("page-chat").classList.contains("active") && !document.hidden && chatView === "family"; }
 
 function resetChat() {
   lastMsgId = 0; unread = 0;
@@ -1473,9 +1527,19 @@ function resetChat() {
 
 function renderChatState() {
   $("chatOff").hidden = !!familyCode;
-  $("chatOn").hidden = !familyCode;
-  $("chatBadge").hidden = unread === 0;
-  $("chatBadge").textContent = unread;
+  $("chatViews").hidden = !familyCode;
+  $("chatOn").hidden = !familyCode || chatView !== "family";
+  $("dmView").hidden = !familyCode || chatView !== "dms";
+  $("viewFamilyChat").className = "btn small" + (chatView === "family" ? "" : " ghost");
+  $("viewDms").className = "btn small" + (chatView === "dms" ? "" : " ghost");
+  // The badge on the Chat tab adds up family chat + direct messages
+  const dmCount = typeof dmUnreadTotal === "function" ? dmUnreadTotal() : 0;
+  $("chatBadge").hidden = unread + dmCount === 0;
+  $("chatBadge").textContent = unread + dmCount;
+  $("familyChatBadge").hidden = unread === 0;
+  $("familyChatBadge").textContent = unread;
+  $("dmBadge").hidden = dmCount === 0;
+  $("dmBadge").textContent = dmCount;
 }
 
 function addMessageToList(m) {
@@ -1523,7 +1587,8 @@ $("chatForm").addEventListener("submit", async e => {
 
 // Opening the Chat tab clears the unread badge
 document.querySelector("[data-page=chat]").addEventListener("click", () => {
-  unread = 0; renderChatState();
+  if (chatView === "family") unread = 0;
+  renderChatState();
   $("chatList").scrollTop = $("chatList").scrollHeight;
 });
 
@@ -1611,7 +1676,7 @@ $("commentForm").addEventListener("submit", async e => {
 });
 
 // Check for siblings' changes (and new messages) every 5 seconds, and right away when you come back
-setInterval(() => { pushChanges(); pullChanges(); pullMessages(); pullComments(); pullChannelName(); pullVotes(); pullWins(); }, 5000);
+setInterval(() => { pushChanges(); pullChanges(); pullMessages(); pullComments(); pullChannelName(); pullVotes(); pullWins(); pullDms(); }, 5000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { pullChanges(); pullMessages(); pullComments(); } });
 
 /* ---------- 4i. SETTINGS: EMOJI ON/OFF ----------
@@ -3147,6 +3212,133 @@ $("winForm").addEventListener("submit", async e => {
 });
 renderScoreboard();
 
+/* ---------- 4z. DIRECT MESSAGES ----------
+   Each person claims their name with a secret PIN. The database only hands out
+   messages that were sent BY you or TO you, and only if your PIN is right.
+   (We remember your PIN on this device so you don't have to type it every time.
+   Press 🔒 Lock on a shared device!) */
+let dmMe = load("tes_dm", null);       // { name, pin } once unlocked on this device
+let dms = [];                          // your messages, oldest first
+let lastDmId = 0;
+let dmPeople = [];                     // everyone who has set up direct messages
+let dmWith = null;                     // who you're talking to right now (or null = the list)
+let dmSeen = load("tes_dm_seen", {});  // { "sam": 42 } = newest message from Sam you've read
+let newsDmId = load("tes_news_dm", null);
+
+const lc = name => (name || "").toLowerCase();
+
+function setChatView(view) { chatView = view; save("tes_chat_view", view); if (view === "family") unread = 0; renderChatState(); renderDms(); }
+$("viewFamilyChat").addEventListener("click", () => setChatView("family"));
+$("viewDms").addEventListener("click", () => setChatView("dms"));
+
+function dmIsOpen(name) { return chatView === "dms" && dmWith && lc(dmWith) === lc(name) && $("page-chat").classList.contains("active") && !document.hidden; }
+
+// How many messages TO you that you haven't read (from one person, or everyone)
+function dmUnreadFrom(name) { return dms.filter(d => lc(d.from_name) === lc(name) && lc(d.to_name) === lc(dmMe && dmMe.name) && d.id > (dmSeen[lc(name)] || 0)).length; }
+function dmUnreadTotal() { return dmMe ? dmPeople.reduce((sum, p) => sum + dmUnreadFrom(p), 0) : 0; }
+
+function markDmsSeen(name) {
+  const last = dms.filter(d => lc(d.from_name) === lc(name)).pop();
+  if (last && (dmSeen[lc(name)] || 0) < last.id) { dmSeen[lc(name)] = last.id; save("tes_dm_seen", dmSeen); }
+}
+
+$("dmLogin").addEventListener("submit", async e => {
+  e.preventDefault();
+  const name = $("dmNameInput").value.trim(), pin = $("dmPinInput").value.trim();
+  if (!name) { showToast("✏️ Type your name!"); return; }
+  if (!/^[0-9]{4,8}$/.test(pin)) { showToast("🔢 Your PIN needs to be 4 to 8 numbers."); return; }
+  try {
+    const result = await callDb("dm_login", { code: familyCode, name, pin });
+    if (result === "wrong_pin") { showToast("🙅 Wrong PIN for " + name + ". Try again!"); $("dmPinInput").value = ""; return; }
+    // Use the name exactly how it was first claimed (so "sam" and "Sam" are the same person)
+    const people = await callDb("dm_members", { code: familyCode });
+    const real = (people.find(p => lc(p.name) === lc(name)) || { name }).name;
+    dmMe = { name: real, pin }; save("tes_dm", dmMe);
+    $("dmPinInput").value = "";
+    newsDmId = null; dms = []; lastDmId = 0;
+    showToast(result === "created" ? "🎉 Name claimed! Remember your PIN!" : "🔓 Unlocked! Hi " + real + "!");
+    await pullDms();
+  } catch (err) { showToast("😕 Couldn't unlock. Check your internet and try again."); }
+});
+
+function dmSignOut(showMessage = true) {
+  dmMe = null; dms = []; lastDmId = 0; dmWith = null; dmPeople = []; newsDmId = null;
+  try { localStorage.removeItem("tes_dm"); } catch (e) {}
+  save("tes_news_dm", null);
+  renderDms(); renderChatState();
+  if (showMessage) showToast("🔒 Locked. Your messages are hidden on this device.");
+}
+$("dmLock").addEventListener("click", () => dmSignOut(true));
+
+async function pullDms() {
+  if (!familyCode || !dmMe) return renderDms();
+  try {
+    const [rows, people] = await Promise.all([
+      callDb("dm_get", { code: familyCode, name: dmMe.name, pin: dmMe.pin, after_id: lastDmId }),
+      callDb("dm_members", { code: familyCode })
+    ]);
+    dmPeople = people.map(p => p.name).filter(n => lc(n) !== lc(dmMe.name));
+    const fresh = rows.filter(d => d.id > lastDmId);
+    fresh.forEach(d => { dms.push(d); lastDmId = d.id; });
+    // What's new (without showing the private words, just who)
+    if (newsDmId === null) newsDmId = lastDmId;
+    fresh.filter(d => d.id > newsDmId && lc(d.to_name) === lc(dmMe.name) && !dmIsOpen(d.from_name))
+      .forEach(d => addNews("✉️ New direct message from " + d.from_name));
+    newsDmId = Math.max(newsDmId, lastDmId); save("tes_news_dm", newsDmId);
+    if (dmWith) markDmsSeen(dmWith);
+    renderDms(); renderChatState();
+  } catch (e) {
+    if (String(e).includes("Wrong name or PIN")) dmSignOut(false); // PIN changed or name removed: ask again
+  }
+}
+
+function renderDms() {
+  const unlocked = !!(familyCode && dmMe);
+  $("dmLogin").hidden = unlocked;
+  $("dmInbox").hidden = !unlocked || !!dmWith;
+  $("dmThread").hidden = !unlocked || !dmWith;
+  if (!unlocked) { if (!$("dmNameInput").value) $("dmNameInput").value = myName(); return; }
+  $("dmWhoAmI").textContent = "✉️ Messages for " + dmMe.name;
+  // The list of people, with the newest message and unread count
+  $("dmPeople").replaceChildren(...(dmPeople.length ? dmPeople.map(name => {
+    const withThem = dms.filter(d => lc(d.from_name) === lc(name) || lc(d.to_name) === lc(name));
+    const last = withThem[withThem.length - 1];
+    const n = dmUnreadFrom(name);
+    return el("button", { class: "dm-person", type: "button", onclick: () => openDm(name) },
+      el("span", { class: "who" }, name),
+      el("span", { class: "preview" }, last ? (lc(last.from_name) === lc(dmMe.name) ? "You: " : "") + last.body : "Say hi! 👋"),
+      n ? el("span", { class: "badge" }, String(n)) : "");
+  }) : [el("div", { class: "empty" }, "Nobody else has set up direct messages yet. Tell your siblings to open ✉️ Direct messages!")]));
+  if (dmWith) renderDmThread();
+}
+
+function openDm(name) { dmWith = name; markDmsSeen(name); renderDms(); renderChatState(); $("dmText").focus(); }
+$("dmBack").addEventListener("click", () => { dmWith = null; renderDms(); });
+
+function renderDmThread() {
+  $("dmThreadTitle").textContent = "✉️ " + dmWith;
+  const list = $("dmList");
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+  list.replaceChildren(...dms.filter(d => lc(d.from_name) === lc(dmWith) || lc(d.to_name) === lc(dmWith)).map(d => {
+    const time = new Date(d.created_at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+    return el("div", { class: "msg" + (lc(d.from_name) === lc(dmMe.name) ? " mine" : "") },
+      el("div", { class: "who" }, d.from_name + " · " + time), el("div", {}, d.body));
+  }));
+  if (atBottom || !list.dataset.opened) { list.scrollTop = list.scrollHeight; list.dataset.opened = "1"; }
+}
+
+$("dmForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const body = $("dmText").value.trim();
+  if (!body || !dmWith) return;
+  try {
+    await callDb("dm_send", { code: familyCode, name: dmMe.name, pin: dmMe.pin, to_name: dmWith, body });
+    $("dmText").value = "";
+    await pullDms();
+    $("dmList").scrollTop = $("dmList").scrollHeight;
+  } catch (err) { showToast("😕 Message didn't send. Check your internet!"); }
+});
+
 /* ---------- Draw everything ---------- */
 function renderAll() {
   renderStats(); renderBank(); renderShorts(); renderBoard();
@@ -3172,6 +3364,7 @@ pullComments();
 pullChannelName();
 pullVotes();
 pullWins();
+pullDms();
 </script>
 </body>
 </html>
