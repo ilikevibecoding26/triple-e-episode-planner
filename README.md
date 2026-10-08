@@ -36,6 +36,8 @@
 - **🎲 Who goes first?** — type the names, then pick a random order or make 2 teams.
 - **🏆 Sibling scoreboard** — add who won each challenge and see the all-time leaderboard (shared with the family).
 
+**📦 Archive** (in the Planner) — Finished a video? On Posted cards the ▶ becomes **📦** — tap it to archive the card so the board stays tidy (or use 📦 Archive in the card's pop-up). **📦 Show archived** brings them back (faded), with an Unarchive button.
+
 **🗓️ Calendar** (in the Planner) — switch between **📋 Board** and **🗓️ Calendar** to see every film day and post day on a month calendar.
 
 **🎥 Shot list** (in each planner card) — the scenes to film, in order. Use the starter shots or add your own, move them with ▲ ▼, and tick them off as you film.
@@ -43,6 +45,8 @@
 **🤪 Idea Mashup** (on the Spin tab) — Makes a new idea from your bank: a **Double Challenge** (two short games in one video, most wins = champion) or a **twist** that fits that kind of video (like *Floor Is Lava Parkour, but no jumping allowed!*). It never mixes Gaming and Challenge ideas. Send it to the Planner if you like it.
 
 **📱 Home screen app** — In Safari tap Share ⬆️ → **Add to Home Screen** to get the planner as an app with its own icon.
+
+**✏️ Our punishments & twists** — Under the 🎡 wheel, add your own punishments (they become wheel slices; you can turn the starter ones off). Under 🤪 Mashup, add your own twists for Gaming, Challenge, or Both. Shared with the family when you're connected.
 
 **🎉 Fun Extras** — A spinning punishment wheel, a title helper (*Who + What + Hook*), and a random intro-line picker.
 
