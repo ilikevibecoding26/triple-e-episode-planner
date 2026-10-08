@@ -2857,32 +2857,33 @@ $("scriptDownload").addEventListener("click", () => {
    2) a TWIST on one idea — but only twists that make sense for that kind of video
       (we use videoKind() from the script maker to tell what kind it is). */
 // "kinds" = which kinds of video the twist works for ("all" = any of them)
-// "kinds" = which kinds of video the twist works for ("all" = any of them)
+// "key" = words that mean the same idea. If one of YOUR twists has those words, it gets the same rules
+//         (so your own "but blindfolded" can't go on Try Not to Laugh either).
 // "avoid" = skip the twist if the idea already has it (no "Swap Builds Halfway, but we swap builds halfway!")
 const HAS_A_WINNER = ["build", "battle", "race", "contest", "guessing", "show-off", "hide and seek", "try not to laugh", "survival", "challenge"]; // every kind except "day" (those don't have a winner)
 const TWISTS = {
   Challenge: [
-    { text: "but BLINDFOLDED", kinds: ["race", "guessing", "contest", "show-off", "challenge"], avoid: /blindfold/ },
-    { text: "but in the DARK with flashlights", kinds: ["hide and seek", "guessing", "try not to laugh"], avoid: /dark|lights off|flashlight/ },
-    { text: "but the youngest is the judge", kinds: HAS_A_WINNER, avoid: /youngest/ },
-    { text: "but nobody can talk", kinds: ["race", "build", "contest", "show-off", "try not to laugh", "challenge"], avoid: /whisper|banned word|talk/ },
-    { text: "with the punishment wheel after every round", kinds: HAS_A_WINNER },
-    { text: "but in slow motion", kinds: ["race", "show-off", "contest"] },
-    { text: "but you have to hop on one foot", kinds: ["race", "contest", "show-off"] },
-    { text: "in only 60 seconds", kinds: ["build", "guessing", "show-off", "contest"], avoid: /seconds|minute|timed/ },
-    { text: "but a parent gets to play too", kinds: "all", avoid: /parent/ }
+    { text: "but BLINDFOLDED", key: /blindfold|eyes closed|can.t see/, kinds: ["race", "guessing", "contest", "show-off", "challenge"], avoid: /blindfold/ },
+    { text: "but in the DARK with flashlights", key: /dark|lights off|flashlight/, kinds: ["hide and seek", "guessing", "try not to laugh"], avoid: /dark|lights off|flashlight/ },
+    { text: "but the youngest is the judge", key: /judge/, kinds: HAS_A_WINNER, avoid: /youngest/ },
+    { text: "but nobody can talk", key: /talk|silent|quiet|no words|whisper/, kinds: ["race", "build", "contest", "show-off", "try not to laugh", "challenge"], avoid: /whisper|banned word|talk/ },
+    { text: "with the punishment wheel after every round", key: /wheel/, kinds: HAS_A_WINNER },
+    { text: "but in slow motion", key: /slow motion|slow-mo/, kinds: ["race", "show-off", "contest"] },
+    { text: "but you have to hop on one foot", key: /hop|one foot|one leg/, kinds: ["race", "contest", "show-off"] },
+    { text: "in only 60 seconds", key: /\d+ ?(sec|second|min|minute)/, kinds: ["build", "guessing", "show-off", "contest"], avoid: /seconds|minute|timed/ },
+    { text: "but a parent gets to play too", key: /parent|mom|dad|grown.?up/, kinds: "all", avoid: /parent/ }
   ],
   Gaming: [
-    { text: "but in Hardcore Mode", kinds: ["survival", "race", "battle", "challenge"], avoid: /hardcore/ },
-    { text: "but with only one block type", kinds: ["build"], avoid: /one block|one type/ },
-    { text: "but we swap builds halfway", kinds: ["build"], avoid: /swap|relay/ },
-    { text: "in only 10 minutes", kinds: ["build", "contest", "race", "guessing"], avoid: /seconds|minute|timed|speed/ },
-    { text: "but no jumping allowed", kinds: ["race", "battle", "hide and seek"], avoid: /jump/ },
-    { text: "on a one-block island", kinds: ["build", "survival"], avoid: /island|one block/ },
-    { text: "but the comments pick the winner", kinds: HAS_A_WINNER, avoid: /comment/ },
-    { text: "but everyone has to wear leather armor", kinds: ["battle", "survival"], avoid: /armor|gear/ },
-    { text: "but we can only use what's in one chest", kinds: ["build", "survival", "battle"], avoid: /whatever we mine|chest/ },
-    { text: "but a parent joins our world", kinds: "all", avoid: /parent/ }
+    { text: "but in Hardcore Mode", key: /hardcore/, kinds: ["survival", "race", "battle", "challenge"], avoid: /hardcore/ },
+    { text: "but with only one block type", key: /one block type|one type of block|only one block/, kinds: ["build"], avoid: /one block|one type/ },
+    { text: "but we swap builds halfway", key: /swap/, kinds: ["build"], avoid: /swap|relay/ },
+    { text: "in only 10 minutes", key: /\d+ ?(sec|second|min|minute)/, kinds: ["build", "contest", "race", "guessing"], avoid: /seconds|minute|timed|speed/ },
+    { text: "but no jumping allowed", key: /jump/, kinds: ["race", "battle", "hide and seek"], avoid: /jump/ },
+    { text: "on a one-block island", key: /island/, kinds: ["build", "survival"], avoid: /island|one block/ },
+    { text: "but the comments pick the winner", key: /comment|viewers/, kinds: HAS_A_WINNER, avoid: /comment/ },
+    { text: "but everyone has to wear leather armor", key: /armor/, kinds: ["battle", "survival"], avoid: /armor|gear/ },
+    { text: "but we can only use what's in one chest", key: /chest/, kinds: ["build", "survival", "battle"], avoid: /whatever we mine|chest/ },
+    { text: "but a parent joins our world", key: /parent|mom|dad|grown.?up/, kinds: "all", avoid: /parent/ }
   ]
 };
 // Big, long videos that are too much to squish together with another one
@@ -2900,7 +2901,11 @@ function makeMashup(tries = 0) {
   const twistsFor = idea => {
     const kind = videoKind(idea.title, idea.desc).name, text = (idea.title + " " + idea.desc).toLowerCase();
     const ours = customs.filter(c => c.kind === "twist" && (c.channel === "Both" || c.channel === channel))
-      .map(c => ({ text: c.text, kinds: "all" }))
+      .map(c => {
+        // Does it mean the same as one of the built-in twists? Then borrow that one's rules.
+        const twin = [...TWISTS.Challenge, ...TWISTS.Gaming].find(t => t.key && t.key.test(c.text.toLowerCase()));
+        return twin ? { text: c.text, kinds: twin.kinds, avoid: twin.avoid } : { text: c.text, kinds: "all" };
+      })
       .filter(t => !text.includes(t.text.replace(/^(but|with|in|on|without) /i, "").toLowerCase())); // skip if the idea already has it
     return [...(TWISTS[channel] || TWISTS.Challenge), ...ours]
       .filter(t => (t.kinds === "all" || t.kinds.includes(kind)) && !(t.avoid && t.avoid.test(text)));
@@ -3464,6 +3469,9 @@ async function addCustom(kind, text, channel) {
   if (!text) return;
   if (kind === "twist" && !/^(but|with|in|on|without|while)\b/i.test(text)) text = "but " + text; // "in pajamas" -> "but in pajamas"
   if (customs.some(c => c.kind === kind && c.text.toLowerCase() === text.toLowerCase())) { showToast("😄 That one's already on the list!"); return; }
+  // Already one of the built-in ones?
+  const builtIn = kind === "twist" ? [...TWISTS.Challenge, ...TWISTS.Gaming].map(t => t.text) : PUNISHMENTS;
+  if (builtIn.some(b => b.toLowerCase().replace(/!+$/, "") === text.toLowerCase())) { showToast("😄 That's already one of the built-in " + kind + "s!"); return; }
   if (familyCode) {
     try { await callDb("add_custom", { code: familyCode, kind, text, channel, added_by: myName() }); await pullCustoms(); }
     catch (e) { showToast("😕 Couldn't save it. Check your internet!"); return; }
